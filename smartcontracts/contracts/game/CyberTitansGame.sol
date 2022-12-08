@@ -18,6 +18,7 @@ contract CyberTitansGame is Ownable {
     uint256 gameCounter;
 
     address public wallet;
+    address public poolWallet;
     address public manager;
     address public signer;
 
@@ -28,16 +29,18 @@ contract CyberTitansGame is Ownable {
 
     event onGameCreated(uint256 _id);
 
-    constructor(address _manager, address _signer, address _wallet) {
+    constructor(address _manager, address _signer, address _wallet, address _poolWallet) {
         manager = _manager;
         signer = _signer;
         wallet = _wallet;
+        poolWallet = _wallet;
     }
 
-    function changeWallets(address _manager, address _signer, address _wallet) external onlyOwner {
+    function changeWallets(address _manager, address _signer, address _wallet, address _poolWallet) external onlyOwner {
         manager = _manager;
         signer = _signer;
         wallet = _wallet;
+        poolWallet = _poolWallet;
     }
 
     function updateBets(uint16[] memory _bets) external onlyOwner {
@@ -53,10 +56,11 @@ contract CyberTitansGame is Ownable {
         pause = !pause;
     }
 
-    function startGame(address[] memory _players, address _token, uint256 _betIndex) external {
+    function startGame(address[] memory _players, bool[] memory _ctt address _token, uint256 _betIndex) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_betIndex >= 0 && _betIndex <= bets.length, "BadIndex");
+        require(_players.length == _ctt.length, "BadArrays");
 
         uint gameId = ++gameCounter;
         uint256 bet = bets[_betIndex] * 10 ** 18;
@@ -69,7 +73,8 @@ contract CyberTitansGame is Ownable {
         });
 
         for (uint256 i=0; i<=_players.length; i++) {
-            ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), bet);
+            if (_ctt[i] == false) ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), bet);
+            else ILitlabGamesToken(_token).safeTransferFrom(poolWallet, address(this), bet);
         }
 
         emit onGameCreated(gameId);

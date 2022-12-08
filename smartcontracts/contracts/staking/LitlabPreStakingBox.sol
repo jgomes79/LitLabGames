@@ -7,12 +7,6 @@ import "../utils/Ownable.sol";
 contract LitlabPreStakingBox is Ownable {
     using SafeERC20 for IERC20;
 
-    struct GameStruct {
-        address[] players;
-        uint256 totalBet;
-        address token;
-        uint256 startDate;
-    }
     mapping(uint256 => GameStruct) private games;
     uint256 gameCounter;
 
