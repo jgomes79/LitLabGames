@@ -9,7 +9,7 @@ async function doDeploy(deployer, network, accounts) {
     let token = await LitlabGamesToken.deployed();
     console.log('LitlabGamesToken deployed:', token.address);
 
-    await deployer.deploy(LITTVestingContract, litGamesWallet);
+    await deployer.deploy(LITTVestingContract, token.address, litGamesWallet);
     let vesting = await LITTVestingContract.deployed();
     console.log('LITTVestingContract deployed:', vesting.address);
 
@@ -17,7 +17,7 @@ async function doDeploy(deployer, network, accounts) {
     const tokenSupply = await token.totalSupply();
     await token.transfer(vesting.address, tokenSupply);
 
-    await deployer.deploy(CyberTitansGame, accounts[0], accounts[1], accounts[2]);
+    await deployer.deploy(CyberTitansGame, accounts[0], accounts[1], accounts[2], litGamesWallet);
     let cyberTitansGame = await CyberTitansGame.deployed();
     console.log('CyberTitansGame deployed:', cyberTitansGame.address);
 }

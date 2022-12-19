@@ -2,27 +2,29 @@
 pragma solidity 0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
+import "@ganache/console.log/console.sol";
+
 contract LITTVestingContract is Ownable {
+    using SafeERC20 for IERC20;
+
     enum VestingType {
-        ANGEL_ROUND = 1,
-        SEED_ROUND = 2,
-        STRATEGIC_ROUND = 3,
-        PUBLIC_ROUND = 4,
-        INITIAL_LIQUIDITY = 5,
-        NEW_GAMES = 6,
-        MARKETING = 7,
-        LIQUID_RESERVES = 8,
-        INGAME_REWARDS = 9,
-        MARKETING = 10,
-        LIQUID_RESERVES = 11,
-        INGAME_REWARDS = 12,
-        FARMING = 13,
-        AIRDROPS = 14,
-        PRESTAKING = 15,
-        ADVISORS = 16,
-        TEAM = 17
+        ANGEL_ROUND,
+        SEED_ROUND,
+        STRATEGIC_ROUND,
+        PUBLIC_ROUND,
+        INITIAL_LIQUIDITY,
+        NEW_GAMES,
+        MARKETING,
+        LIQUID_RESERVES,
+        INGAME_REWARDS,
+        FARMING,
+        AIRDROPS,
+        PRESTAKING,
+        ADVISORS,
+        TEAM
     }
 
     // TODO. Check if needed
@@ -43,17 +45,21 @@ contract LITTVestingContract is Ownable {
     uint256 public advisors = 120000000 * 10 ** 18;
     uint256 public team = 420000000 * 10 ** 18;
 
+    address public token;
     address public wallet;
     uint256 public listing_date;
 
     mapping(uint8 => uint256) public withdrawnBalances;
 
-    constructor(address _wallet) {  
+    event onWithdrawToken(address _wallet, uint256 _amount);
+
+    constructor(address _token, address _wallet) {
+        token = _token;
         wallet = _wallet;
     }
 
     function setListingDate(uint256 _listingDate) external onlyOwner {
-        listingDate = _listingDate;
+        listing_date = _listingDate;
     }
 
     function changeWallet(address _wallet) external onlyOwner {
@@ -62,24 +68,33 @@ contract LITTVestingContract is Ownable {
 
     function withdrawAngelRound() external {
         // Angel Round	15% at TGE, linearly over 36 months
-        require(block.timestamp >= listingDate, "TooEarly");
-        require(withdrawnBalances[VestingType.ANGEL_ROUND)] <= angel_round, "MaxBalance");
+        require(block.timestamp >= listing_date, "TooEarly");
+        require(withdrawnBalances[uint8(VestingType.ANGEL_ROUND)] < angel_round, "MaxBalance");
 
-        if (withdrawnBalances[VestingType.ANGEL_ROUND) == 0) {
+        if (withdrawnBalances[uint8(VestingType.ANGEL_ROUND)] == 0) {
             uint256 amount = angel_round * 15 / 100;
-            withdrawnBalances[VestingType.ANGEL_ROUND)] = amount;
+            withdrawnBalances[uint8(VestingType.ANGEL_ROUND)] = amount;
             _sendTokens(wallet, amount);
         } else {
-            uint256 timeDiff = block.timestamp - listingDate;
+            uint256 timeDiff = block.timestamp - listing_date;
             uint256 month = (timeDiff / 30 days);   // Month number after listing.
-            uint256 monthTranche = angel_round - (angel_round * 15 / 100) / 36;
-            uint256 tranchesWithdrawed = withdrawnBalances[VestingType.ANGEL_ROUND] / monthTranche;
+            uint256 monthTranche = (angel_round - (angel_round * 15 / 100)) / 36;
+            uint256 tranchesWithdrawed = (withdrawnBalances[uint8(VestingType.ANGEL_ROUND)] - (angel_round * 15 / 100)) / monthTranche;
 
             if (month > tranchesWithdrawed) {
+                console.log("timeDiff: %d", timeDiff);
+                console.log("month: %d", month);
+                console.log("monthTranche: %d", monthTranche);
+                console.log("tranchesWithdrawed: %d", tranchesWithdrawed);
+                console.log("withdrawBalances: %d", withdrawnBalances[uint8(VestingType.ANGEL_ROUND)]);
+
                 uint256 numTranches = month - tranchesWithdrawed;
                 uint256 availableAmount = monthTranche * numTranches;
 
-                withdrawnBalances[VestingType.ANGEL_ROUND] += availableAmount;
+                if (withdrawnBalances[uint8(VestingType.ANGEL_ROUND)] + availableAmount > angel_round) {
+                    availableAmount = angel_round - withdrawnBalances[uint8(VestingType.ANGEL_ROUND)];
+                } 
+                withdrawnBalances[uint8(VestingType.ANGEL_ROUND)] += availableAmount;
                 _sendTokens(wallet, availableAmount);
             }
         }
@@ -99,8 +114,8 @@ contract LITTVestingContract is Ownable {
 
     function withdrawInitialLiquidity() external {
         // No vesting
-        require(block.timestamp >= listingDate, "TooEarly");
-        require(withdrawnBalances[VestingType.INITIAL_LIQUIDITY)] <= initial_liquidity, "MaxBalance");
+        require(block.timestamp >= listing_date, "TooEarly");
+        require(withdrawnBalances[uint8(VestingType.INITIAL_LIQUIDITY)] <= initial_liquidity, "MaxBalance");
     }
 
     function withdrawNewGames() external {
@@ -109,13 +124,43 @@ contract LITTVestingContract is Ownable {
 
     function withdrawMarketing() external {
         // Marketing 5% at TGE, linearly over 18 months
+        require(block.timestamp >= listing_date, "TooEarly");
+        require(withdrawnBalances[uint8(VestingType.MARKETING)] < marketing, "MaxBalance");
+
+        if (withdrawnBalances[uint8(VestingType.MARKETING)] == 0) {
+            uint256 amount = marketing * 5 / 100;
+            withdrawnBalances[uint8(VestingType.MARKETING)] = amount;
+            _sendTokens(wallet, amount);
+        } else {
+            uint256 timeDiff = block.timestamp - listing_date;
+            uint256 month = (timeDiff / 30 days);   // Month number after listing.
+            uint256 monthTranche = (marketing - (marketing * 5 / 100)) / 18;
+            uint256 tranchesWithdrawed = (withdrawnBalances[uint8(VestingType.MARKETING)] - (marketing * 5 / 100)) / monthTranche;
+
+            if (month > tranchesWithdrawed) {
+                console.log("timeDiff: %d", timeDiff);
+                console.log("month: %d", month);
+                console.log("monthTranche: %d", monthTranche);
+                console.log("tranchesWithdrawed: %d", tranchesWithdrawed);
+                console.log("withdrawBalances: %d", withdrawnBalances[uint8(VestingType.MARKETING)]);
+
+                uint256 numTranches = month - tranchesWithdrawed;
+                uint256 availableAmount = monthTranche * numTranches;
+
+                if (withdrawnBalances[uint8(VestingType.MARKETING)] + availableAmount > marketing) {
+                    availableAmount = marketing - withdrawnBalances[uint8(VestingType.MARKETING)];
+                } 
+                withdrawnBalances[uint8(VestingType.MARKETING)] += availableAmount;
+                _sendTokens(wallet, availableAmount);
+            }
+        }
     }
 
     function withdrawLiquidReserves() external {
         // Liquid Reserves	Vesting linearly over 24 months
     }
 
-    function withdrawLiquidReserves() external {
+    function withdrawIngameRewards() external {
         // InGame rewards	Over 48 months
     }
 
@@ -135,8 +180,18 @@ contract LITTVestingContract is Ownable {
         // Advisors	3 months cliff + 24 months vesting
     }
 
-    function withdrawAdvisors() external {
+    function withdrawTeam() external {
         // Team	6 months cliff + 42 months linear vesting
+    }
+
+    function getTokensInVesting() external view returns(uint256) {
+        return IERC20(token).balanceOf(address(this));
+    }
+
+    function _sendTokens(address _wallet, uint256 _amount) internal {
+        IERC20(token).transfer(_wallet, _amount);
+
+        emit onWithdrawToken(_wallet, _amount);
     }
 
 /*

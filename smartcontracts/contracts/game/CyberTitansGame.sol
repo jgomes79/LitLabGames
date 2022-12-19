@@ -33,7 +33,7 @@ contract CyberTitansGame is Ownable {
         manager = _manager;
         signer = _signer;
         wallet = _wallet;
-        poolWallet = _wallet;
+        poolWallet = _poolWallet;
     }
 
     function changeWallets(address _manager, address _signer, address _wallet, address _poolWallet) external onlyOwner {
@@ -56,7 +56,7 @@ contract CyberTitansGame is Ownable {
         pause = !pause;
     }
 
-    function startGame(address[] memory _players, bool[] memory _ctt address _token, uint256 _betIndex) external {
+    function startGame(address[] memory _players, bool[] memory _ctt, address _token, uint256 _betIndex) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_betIndex >= 0 && _betIndex <= bets.length, "BadIndex");
