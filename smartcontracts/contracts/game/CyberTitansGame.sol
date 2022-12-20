@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
 
+import "@ganache/console.log/console.sol";
+
 contract CyberTitansGame is Ownable {
     using SafeERC20 for ILitlabGamesToken;
 
@@ -25,20 +27,20 @@ contract CyberTitansGame is Ownable {
     uint16[] public bets = [1, 10, 100, 500, 1000, 5000];
     uint16[] public winners = [475, 285, 190];
     uint16 public fee = 25;
+    uint16 public waitMinutes = 15;
     bool private pause;
 
-    event onGameCreated(uint256 _id);
+    event onGameCreated(uint256 _gameId);
+    event onGameFinalized(uint256 _gameId, address _winner1, address _winner2, address _winner3);
 
-    constructor(address _manager, address _signer, address _wallet, address _poolWallet) {
+    constructor(address _manager, address _wallet, address _poolWallet) {
         manager = _manager;
-        signer = _signer;
         wallet = _wallet;
         poolWallet = _poolWallet;
     }
 
-    function changeWallets(address _manager, address _signer, address _wallet, address _poolWallet) external onlyOwner {
+    function changeWallets(address _manager, address _wallet, address _poolWallet) external onlyOwner {
         manager = _manager;
-        signer = _signer;
         wallet = _wallet;
         poolWallet = _poolWallet;
     }
@@ -56,14 +58,20 @@ contract CyberTitansGame is Ownable {
         pause = !pause;
     }
 
-    function startGame(address[] memory _players, bool[] memory _ctt, address _token, uint256 _betIndex) external {
+    function createGame(address[] memory _players, bool[] memory _ctt, address _token, uint256 _betIndex) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_betIndex >= 0 && _betIndex <= bets.length, "BadIndex");
         require(_players.length == _ctt.length, "BadArrays");
 
+        console.log("Todos los checks pasan");
+        console.log("bets[index]: %d", bets[_betIndex]);
+        console.log("bets[index] multiplied: %d", uint256(bets[_betIndex]) * 10 ** 18);
+
         uint gameId = ++gameCounter;
-        uint256 bet = bets[_betIndex] * 10 ** 18;
+        uint256 bet = uint256(bets[_betIndex]) * 10 ** 18;
+
+        console.log("totalBet: %d", bet * _players.length);
             
         games[gameId] = GameStruct({
             players: _players,
@@ -72,7 +80,7 @@ contract CyberTitansGame is Ownable {
             startDate: block.timestamp
         });
 
-        for (uint256 i=0; i<=_players.length; i++) {
+        for (uint256 i=0; i<_players.length; i++) {
             if (_ctt[i] == false) ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), bet);
             else ILitlabGamesToken(_token).safeTransferFrom(poolWallet, address(this), bet);
         }
@@ -80,42 +88,21 @@ contract CyberTitansGame is Ownable {
         emit onGameCreated(gameId);
     }
 
-    function finalizeGame(bytes calldata _message, bytes calldata _messageLen, bytes calldata _signature) external {
+    function finalizeGame(uint256 _gameId, address _winner1, address _winner2, address _winner3) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
+        // TODO. Check that winners where in the initial players
 
-        (uint256 gameId, address winner1, address winner2, address winner3) = abi.decode(_message,(uint256, address, address, address));
-        address _signer = _decodeSignature(_message, _messageLen, _signature);
-        require(_signer == signer, "BadSigner");
+        GameStruct memory game = games[_gameId];
+        require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes");
 
-        GameStruct memory game = games[gameId];
-        require(block.timestamp >= game.startDate + 10 minutes, "Wait10Minutes");
-
-        ILitlabGamesToken(game.token).safeTransfer(winner1, game.totalBet * winners[0] / 1000);
-        ILitlabGamesToken(game.token).safeTransfer(winner2, game.totalBet * winners[1] / 1000);
-        ILitlabGamesToken(game.token).safeTransfer(winner3, game.totalBet * winners[2] / 1000);
+        ILitlabGamesToken(game.token).safeTransfer(_winner1, game.totalBet * winners[0] / 1000);
+        ILitlabGamesToken(game.token).safeTransfer(_winner2, game.totalBet * winners[1] / 1000);
+        ILitlabGamesToken(game.token).safeTransfer(_winner3, game.totalBet * winners[2] / 1000);
 
         ILitlabGamesToken(game.token).burn(game.totalBet * fee / 1000);
         ILitlabGamesToken(game.token).safeTransfer(wallet, game.totalBet * fee / 1000);
-    }
 
-    function _decodeSignature(bytes memory _message, bytes memory _messageLength, bytes memory _signature) internal pure returns (address) {
-        if (_signature.length != 65) return (address(0));
-
-        bytes32 messageHash = keccak256(abi.encodePacked(hex"19457468657265756d205369676e6564204d6573736167653a0a", _messageLength, _message));
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
-        assembly {
-            r := mload(add(_signature, 0x20))
-            s := mload(add(_signature, 0x40))
-            v := byte(0, mload(add(_signature, 0x60)))
-        }
-
-        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) return address(0);
-        if (v != 27 && v != 28) return address(0);
-        
-        return ecrecover(messageHash, v, r, s);
+        emit onGameFinalized(_gameId, _winner1, _winner2, _winner3);
     }
 }

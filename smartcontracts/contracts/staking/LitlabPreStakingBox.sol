@@ -23,10 +23,10 @@ contract LitlabPreStakingBox is Ownable {
 
     mapping(address => UserStake) private balances;
 
-    event onFund(address _sender, uint256 _amount, uint256 _totalRewards);
     event onInitialWithdraw(address _user, uint256 _amount);
     event onWithdrawRewards(address _user, uint256 _rewards);
     event onWithdraw(address _user, uint256 _amount);
+    event onEmergencyWithdraw();
 
     constructor(address _token, uint256 _stakeStartDate, uint256 _stakeEndDate, uint256 _totalRewards) {
         token = _token;
@@ -60,8 +60,8 @@ contract LitlabPreStakingBox is Ownable {
         totalStakedAmount = total;
     }
 
-    // Añadir mas parametros para el front
-    function getData(address _user) external returns (uint256 userTokensPerSec, uint256 amount, uint256 lastRewardsWithdraw, uint256 rewards) {
+    // TODO. Review parameters to use in the frontend
+    function getData(address _user) external view returns (uint256 userTokensPerSec, uint256 amount, uint256 lastRewardsWithdraw, uint256 rewards) {
         userTokensPerSec = (totalRewards / (stakeEndDate - stakeStartDate)) * balances[_user].amount / totalStakedAmount;
         amount = balances[_user].amount;
         lastRewardsWithdraw = balances[_user].lastRewardsWithdraw;
@@ -101,6 +101,8 @@ contract LitlabPreStakingBox is Ownable {
 
     function withdraw() external {
         require(balances[msg.sender].amount > 0, "NoStaked");
+        require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "Max");
+
         uint256 tokensPerSec = totalRewards / (stakeEndDate - stakeStartDate);
         uint256 userTokensPerSec = tokensPerSec * balances[msg.sender].amount / totalStakedAmount;
         uint256 from = balances[msg.sender].lastRewardsWithdraw == 0 ? stakeStartDate : balances[msg.sender].lastRewardsWithdraw;
@@ -109,14 +111,31 @@ contract LitlabPreStakingBox is Ownable {
         uint256 amount = balances[msg.sender].amount;
         totalStakedAmount -= amount;
         totalRewards -= rewards;
-        balances[msg.sender].withdrawn += amount;
 
-        IERC20(token).safeTransfer(msg.sender, amount + rewards);
+        uint256 tokens = calculateTokens(balances[msg.sender].investorType, amount) - balances[msg.sender].withdrawn;
+        balances[msg.sender].withdrawn += tokens;
+
+        IERC20(token).safeTransfer(msg.sender, tokens + rewards);
 
         emit onWithdraw(msg.sender, amount + rewards);
     }
 
-    function calculateTokens() internal returns (uint256) {
-        
+    function calculateTokens(uint8 _investorType, uint256 _amount) internal view returns (uint256) {
+        uint256 vestingDays = 0;
+        if (_investorType == 1) vestingDays = 36 * 30 days;         // 1 - Angel
+        else if (_investorType == 2) vestingDays = 30 * 30 days;    // 2 - Seed
+        else if (_investorType == 3) vestingDays = 24 * 30 days;    // 3 - Strategic
+
+        uint256 diffTime = block.timestamp - stakeStartDate;
+        if (diffTime > vestingDays) diffTime = vestingDays;
+
+        return diffTime * _amount / vestingDays; 
+    }
+
+    function emergencyWithdraw() external onlyOwner {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransfer(msg.sender, balance);
+
+        emit onEmergencyWithdraw();
     }
 }
