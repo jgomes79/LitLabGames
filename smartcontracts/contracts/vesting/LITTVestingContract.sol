@@ -109,7 +109,7 @@ contract LITTVestingContract is Ownable {
     }
 
     function withdrawPublicRound() external {
-        // Public round	33% unlock at TGE, vesting 2 months
+        // Sin vesting. Esto se le da al exchange
     }
 
     function withdrawInitialLiquidity() external {
