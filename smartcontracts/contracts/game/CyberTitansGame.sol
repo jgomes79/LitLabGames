@@ -54,6 +54,10 @@ contract CyberTitansGame is Ownable {
         fee = _fee;
     }
 
+    function updateWaitMinutes(uint16 _waitMinutes) external onlyOwner {
+        waitMinutes = _waitMinutes;
+    }
+
     function changePause() external onlyOwner {
         pause = !pause;
     }
