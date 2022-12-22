@@ -22,9 +22,7 @@ contract CyberTitansGame is Ownable {
     address public wallet;
     address public poolWallet;
     address public manager;
-    address public signer;
 
-    uint16[] public bets = [1, 10, 100, 500, 1000, 5000];
     uint16[] public winners = [475, 285, 190];
     uint16 public fee = 25;
     uint16 public waitMinutes = 15;
@@ -45,11 +43,6 @@ contract CyberTitansGame is Ownable {
         poolWallet = _poolWallet;
     }
 
-    function updateBets(uint16[] memory _bets) external onlyOwner {
-        delete bets;
-        bets = _bets;
-    }
-
     function updateFee(uint16 _fee) external onlyOwner {
         fee = _fee;
     }
@@ -62,31 +55,34 @@ contract CyberTitansGame is Ownable {
         pause = !pause;
     }
 
-    function createGame(address[] memory _players, bool[] memory _ctt, address _token, uint256 _betIndex) external {
-        require(msg.sender == manager, "OnlyManager");
+    function checkWallets(address[] memory _players, uint256 _amount, address _token) external view returns (bool[] memory) {
+        bool[] memory info = new bool[](_players.length); 
+        for (uint256 i=0; i<_players.length; i++) {
+            uint256 balance = ILitlabGamesToken(_token).balanceOf(_players[i]);
+            if (balance >= _amount) info[i] = true;
+            else info[i] = false;
+        }
+
+        return info;
+    }
+
+    function createGame(address[] memory _players, bool[] memory _ctt, address _token, uint256 _amount) external {
+        //require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
-        require(_betIndex >= 0 && _betIndex <= bets.length, "BadIndex");
         require(_players.length == _ctt.length, "BadArrays");
 
-        console.log("Todos los checks pasan");
-        console.log("bets[index]: %d", bets[_betIndex]);
-        console.log("bets[index] multiplied: %d", uint256(bets[_betIndex]) * 10 ** 18);
-
         uint gameId = ++gameCounter;
-        uint256 bet = uint256(bets[_betIndex]) * 10 ** 18;
 
-        console.log("totalBet: %d", bet * _players.length);
-            
         games[gameId] = GameStruct({
             players: _players,
-            totalBet: bet * _players.length,
+            totalBet: _amount * _players.length,
             token: _token,
             startDate: block.timestamp
         });
 
         for (uint256 i=0; i<_players.length; i++) {
-            if (_ctt[i] == false) ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), bet);
-            else ILitlabGamesToken(_token).safeTransferFrom(poolWallet, address(this), bet);
+            if (_ctt[i] == false) ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), _amount);
+            else ILitlabGamesToken(_token).safeTransferFrom(poolWallet, address(this), _amount);
         }
 
         emit onGameCreated(gameId);
