@@ -8,7 +8,7 @@ import "../token/ILitlabGamesToken.sol";
 import "@ganache/console.log/console.sol";
 
 contract CyberTitansGame is Ownable {
-    using SafeERC20 for ILitlabGamesToken;
+    using SafeERC20 for IERC20;
 
     struct GameStruct {
         uint256 totalBet;
@@ -64,8 +64,8 @@ contract CyberTitansGame is Ownable {
     function checkWallets(address[] memory _players, uint256 _amount, address _token) external view returns (uint256[] memory) {
         uint256[] memory info = new uint256[](_players.length); 
         for (uint256 i=0; i<_players.length; i++) {
-            uint256 balance = ILitlabGamesToken(_token).balanceOf(_players[i]);
-            uint256 allowance = ILitlabGamesToken(_token).allowance(_players[i], address(this));
+            uint256 balance = IERC20(_token).balanceOf(_players[i]);
+            uint256 allowance = IERC20(_token).allowance(_players[i], address(this));
 
             if (allowance >= _amount && balance >= _amount) info[i] = 0;
             else if (allowance < _amount) info[i] = 1;
@@ -90,7 +90,7 @@ contract CyberTitansGame is Ownable {
             startDate: block.timestamp
         });
 
-        for (uint256 i=0; i<_players.length; i++) ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), _amount);
+        for (uint256 i=0; i<_players.length; i++) IERC20(_token).safeTransferFrom(_players[i], address(this), _amount);
 
         emit onGameCreated(gameId);
     }
@@ -102,17 +102,18 @@ contract CyberTitansGame is Ownable {
         GameStruct memory game = games[_gameId];
         require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes");
 
-        for (uint256 i=0; i<_winners.length; i++) ILitlabGamesToken(game.token).safeTransfer(_winners[i], game.totalBet * winners[i] / 1000);
+        for (uint256 i=0; i<_winners.length; i++) IERC20(game.token).safeTransfer(_winners[i], game.totalBet * winners[i] / 1000);
 
+        // TODO. Si se apuestan USDCs, no vamos a quemarlos. Que hacemos en ese caso????
         ILitlabGamesToken(game.token).burn(game.totalBet * fee / 1000);
-        ILitlabGamesToken(game.token).safeTransfer(wallet, game.totalBet * rake / 1000);
+        IERC20(game.token).safeTransfer(wallet, game.totalBet * rake / 1000);
 
         emit onGameFinalized(_gameId, _winners);
     }
 
     function emergencyWithdraw(address _token) external onlyOwner {
         uint256 balance = ILitlabGamesToken(_token).balanceOf(address(this));
-        ILitlabGamesToken(_token).safeTransfer(msg.sender, balance);
+        IERC20(_token).safeTransfer(msg.sender, balance);
 
         emit onEmergencyWithdraw(balance, _token);
     }
