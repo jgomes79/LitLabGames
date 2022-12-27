@@ -17,17 +17,12 @@ async function doDeploy(deployer, network, accounts) {
         await token.approve(cyberTitansGame.address, maxAmount, {from: accounts[i]});
     }
 
-    const poolWallet = await cyberTitansGame.poolWallet();
-    await token.transfer(poolWallet, web3.utils.toWei('10000000'));
-    await token.approve(cyberTitansGame.address, maxAmount, {from: poolWallet});
-
     const players = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]];
-    const ctt = [false, false, false, false, false, false, true, true];
-    const tx = await cyberTitansGame.createGame(players, ctt, token.address, 3);
+    const tx = await cyberTitansGame.createGame(players, token.address, web3.utils.toWei('100'));
     const gameId = tx.logs[0].args._gameId;
 
-    const tx2 = await cyberTitansGame.finalizeGame(gameId, accounts[4], accounts[8], accounts[2]);
-    console.log(tx2);
+    const tx2 = await cyberTitansGame.finalizeGame(gameId, [accounts[4], accounts[8], accounts[2]]);
+    console.log(tx2.logs[0].args);
 }
 
 module.exports = function(deployer, network, accounts) {
