@@ -5,8 +5,8 @@ const CyberTitansGame = artifacts.require("./CyberTitansGame.sol");
 
 async function doDeploy(deployer, network, accounts) {
     const litGamesWallet = accounts[0];
-    const stakingStart = 0;
-    const stakingEnd = 0;
+    const stakingStart = Math.round(new Date('2023-01-01T00:00:00').getTime() / 1000);
+    const stakingEnd = Math.round(new Date('2026-01-01T00:00:00').getTime() / 1000);
     const totalRewards = web3.utils.toWei('1000000');
     const stakersAmount = web3.utils.toWei('1800000');
 
