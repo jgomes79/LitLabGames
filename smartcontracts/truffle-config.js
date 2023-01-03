@@ -68,9 +68,9 @@ module.exports = {
       network_id: "*",       // Any network (default: none)
       disableConfirmationListener: true
     },
-    mumbai: {
-      provider: () => new HDWalletProvider(mnemonic, provider),
-      network_id: 80001,
+    bsctestnet: {
+      provider: () => new HDWalletProvider("", "https://data-seed-prebsc-1-s1.binance.org:8545"),
+      network_id: 97,
       confirmations: 2,
       timeoutBlocks: 200,
       skipDryRun: true
@@ -102,7 +102,7 @@ module.exports = {
   ],
 
   api_keys: {
-    polygonscan: ''
+    bscscan: 'AQZSGEIRSYAVDNR1CGURXVFBN4QKRS328V'
   },
 
   // Truffle DB is currently disabled by default; to enable it, change enabled:

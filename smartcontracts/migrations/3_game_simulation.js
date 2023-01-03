@@ -18,6 +18,8 @@ async function doDeploy(deployer, network, accounts) {
     }
 
     const players = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]];
+    const result = await cyberTitansGame.checkWallets(players, web3.utils.toWei('10000000'), token.address);
+    console.log(result);
     const tx = await cyberTitansGame.createGame(players, token.address, web3.utils.toWei('100'));
     const gameId = tx.logs[0].args._gameId;
 

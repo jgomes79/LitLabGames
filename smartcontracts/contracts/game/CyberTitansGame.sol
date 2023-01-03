@@ -5,21 +5,22 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
 
-import "@ganache/console.log/console.sol";
-
 contract CyberTitansGame is Ownable {
     using SafeERC20 for IERC20;
 
     struct GameStruct {
+        address[] players;
         uint256 totalBet;
         address token;
         uint256 startDate;
+        uint256 endDate;
     }
     mapping(uint256 => GameStruct) private games;
     uint256 gameCounter;
 
     address public wallet;
     address public manager;
+    address public litlabToken;
 
     uint16[] public winners = [475, 285, 190];
     uint16 public rake = 25;
@@ -31,14 +32,16 @@ contract CyberTitansGame is Ownable {
     event onGameFinalized(uint256 _gameId, address[] _winners);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
-    constructor(address _manager, address _wallet) {
+    constructor(address _manager, address _wallet, address _litlabToken) {
         manager = _manager;
         wallet = _wallet;
+        litlabToken = _litlabToken;
     }
 
-    function changeWallets(address _manager, address _wallet) external onlyOwner {
+    function changeWallets(address _manager, address _wallet, address _litlabToken) external onlyOwner {
         manager = _manager;
         wallet = _wallet;
+        litlabToken = _litlabToken;
     }
 
     function changeWinners(uint16[] memory _winners) external onlyOwner {
@@ -85,9 +88,11 @@ contract CyberTitansGame is Ownable {
         uint gameId = ++gameCounter;
 
         games[gameId] = GameStruct({
+            players: _players,
             totalBet: _amount * _players.length,
             token: _token,
-            startDate: block.timestamp
+            startDate: block.timestamp,
+            endDate: 0
         });
 
         for (uint256 i=0; i<_players.length; i++) IERC20(_token).safeTransferFrom(_players[i], address(this), _amount);
@@ -98,15 +103,21 @@ contract CyberTitansGame is Ownable {
     function finalizeGame(uint256 _gameId, address[] calldata _winners) external {
         //require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
+        require(_checkPlayers(_gameId, _winners) == true, "BadPlayers");
 
-        GameStruct memory game = games[_gameId];
+        GameStruct storage game = games[_gameId];
         require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes");
+        require(game.endDate == 0, "AlreadyEnd");
+        game.endDate = block.timestamp;
 
         for (uint256 i=0; i<_winners.length; i++) IERC20(game.token).safeTransfer(_winners[i], game.totalBet * winners[i] / 1000);
 
-        // TODO. Si se apuestan USDCs, no vamos a quemarlos. Que hacemos en ese caso????
-        ILitlabGamesToken(game.token).burn(game.totalBet * fee / 1000);
-        IERC20(game.token).safeTransfer(wallet, game.totalBet * rake / 1000);
+        if (game.token == litlabToken) {
+            ILitlabGamesToken(game.token).burn(game.totalBet * fee / 1000);
+            IERC20(game.token).safeTransfer(wallet, game.totalBet * rake / 1000);
+        } else {
+            IERC20(game.token).safeTransfer(wallet, ((game.totalBet * rake) + (game.totalBet * fee)) / 1000);
+        }
 
         emit onGameFinalized(_gameId, _winners);
     }
@@ -116,5 +127,22 @@ contract CyberTitansGame is Ownable {
         IERC20(_token).safeTransfer(msg.sender, balance);
 
         emit onEmergencyWithdraw(balance, _token);
+    }
+
+    function _checkPlayers(uint256 _gameId, address[] calldata _players) internal view returns(bool) {
+        address[] memory gamePlayers = games[_gameId].players;
+
+        uint256 playersOk = 0;
+        for (uint256 i=0; i<_players.length; i++) {
+            for (uint256 j=0; j<gamePlayers.length; j++) {
+                if (_players[i] == gamePlayers[j]) {
+                    playersOk++;
+                    break;
+                }
+            }
+            if (playersOk == _players.length) return true;
+        }
+
+        return false;
     }
 }

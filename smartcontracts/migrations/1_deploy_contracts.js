@@ -39,7 +39,7 @@ async function doDeploy(deployer, network, accounts) {
     //const tokenSupply = await token.totalSupply();
     //await token.transfer(vesting.address, tokenSupply);
 
-    await deployer.deploy(CyberTitansGame, accounts[0], accounts[2]);
+    await deployer.deploy(CyberTitansGame, accounts[0], accounts[2], token.address);
     let cyberTitansGame = await CyberTitansGame.deployed();
     console.log('CyberTitansGame deployed:', cyberTitansGame.address);
 }

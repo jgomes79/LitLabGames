@@ -48,10 +48,10 @@ async function increaseTo (target) {
 }
 
 async function doDeploy(deployer, network, accounts) {
-    let token = await LitlabGamesToken.deployed();
+    let token = await LitlabGamesToken.at('0x21d5f348C0F3bFc60f9aa9148284B001a50eF538');
     console.log('LitlabGamesToken deployed:', token.address);
 
-    let vesting = await LITTVestingContract.deployed();
+    let vesting = await LITTVestingContract.at('0xF4C07F26Cc34C135ADF16efB8be14e87DeE9858d');
     console.log('LITTVestingContract deployed:', vesting.address);
 
     let now = Math.round(new Date().getTime() / 1000);
