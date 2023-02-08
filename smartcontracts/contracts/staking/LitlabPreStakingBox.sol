@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
-import "@ganache/console.log/console.sol";
-
 contract LitlabPreStakingBox is Ownable {
     using SafeERC20 for IERC20;
+
+    enum InvestorType {
+        ANGEL,
+        SEED,
+        STRATEGIC
+    }
 
     struct UserStake {
         uint256 amount;
         uint256 lastRewardsWithdraw;
-        uint8 investorType; // 1 - Angel, 2 - Seed, 3 - Strategic
+        InvestorType investorType;
         bool claimedInitial;
         uint256 withdrawn;
     }
@@ -37,6 +41,7 @@ contract LitlabPreStakingBox is Ownable {
         totalRewards = _totalRewards;
     }
 
+    // Stake function. Only the owner sets up the initial stake configuration adding users, amounts and the investor type (different vesting)
     function stake(address[] memory _users, uint256[] memory _amounts, uint8[] memory _investorTypes) external onlyOwner {
         require(_users.length == _amounts.length, "BadLenghts");
         require(_investorTypes.length == _amounts.length, "BadLengths");
@@ -45,7 +50,7 @@ contract LitlabPreStakingBox is Ownable {
         for (uint256 i=0; i<_users.length; i++) {
             address user = _users[i];
             uint256 amount = _amounts[i];
-            uint8 investorType = _investorTypes[i];
+            InvestorType investorType = InvestorType(_investorTypes[i]);
             require(amount > 0, "BadAmount");
 
             balances[user] = UserStake({
@@ -62,6 +67,7 @@ contract LitlabPreStakingBox is Ownable {
         totalStakedAmount = total;
     }
 
+    // At TGE users can withdraw the 15% of their investment. Only one time
     function withdrawInitial() external {
         require(block.timestamp >= stakeStartDate, "NotTGE");
         require(balances[msg.sender].amount > 0, "NoStaked");
@@ -76,12 +82,14 @@ contract LitlabPreStakingBox is Ownable {
         emit onInitialWithdraw(msg.sender, amount);
     }
 
+    // Users can withdraw rewards whenever they want but if they withdraw
     function withdrawRewards() external {
         require(balances[msg.sender].amount > 0, "NoStaked");
         require(balances[msg.sender].withdrawn == 0, "Withdrawn");
         require(block.timestamp >= stakeStartDate, "NotYet");
+        require(block.timestamp <= stakeEndDate, "NotYet");
 
-        (uint256 amount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
+        (, , , ,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
         require(pendingRewards > 0, "NoRewardsToClaim");
 
         balances[msg.sender].lastRewardsWithdraw = to;
@@ -90,6 +98,7 @@ contract LitlabPreStakingBox is Ownable {
         emit onWithdrawRewards(msg.sender, pendingRewards);
     }
 
+    // Users withdraws all the balance they can
     function withdraw() external {
         require(balances[msg.sender].amount > 0, "NoStaked");
         require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "Max");
@@ -97,11 +106,11 @@ contract LitlabPreStakingBox is Ownable {
         uint256 amount = 0;
         uint256 rewards = 0;
         if (balances[msg.sender].withdrawn == 0) {
-            (uint256 amount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
-            totalStakedAmount -= amount;
+            (uint256 userAmount, uint256 withdrawn, , ,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
+            totalStakedAmount -= userAmount;
             totalRewards -= pendingRewards;
 
-            uint256 tokens = _calculateTokens(balances[msg.sender].investorType, amount) - withdrawn;
+            uint256 tokens = _calculateTokens(balances[msg.sender].investorType, userAmount) - withdrawn;
             balances[msg.sender].withdrawn += tokens;
             balances[msg.sender].lastRewardsWithdraw = to;
 
@@ -132,11 +141,11 @@ contract LitlabPreStakingBox is Ownable {
         emit onEmergencyWithdraw();
     }
 
-    function _calculateTokens(uint8 _investorType, uint256 _amount) internal view returns (uint256) {
+    function _calculateTokens(InvestorType _investorType, uint256 _amount) internal view returns (uint256) {
         uint256 vestingDays = 0;
-        if (_investorType == 1) vestingDays = 36 * 30 days;         // 1 - Angel
-        else if (_investorType == 2) vestingDays = 30 * 30 days;    // 2 - Seed
-        else if (_investorType == 3) vestingDays = 24 * 30 days;    // 3 - Strategic
+        if (_investorType == InvestorType.ANGEL) vestingDays = 36 * 30 days;
+        else if (_investorType == InvestorType.SEED) vestingDays = 30 * 30 days;
+        else if (_investorType == InvestorType.STRATEGIC) vestingDays = 24 * 30 days;
 
         uint256 diffTime = block.timestamp - stakeStartDate;
         if (diffTime > vestingDays) diffTime = vestingDays;
@@ -144,8 +153,8 @@ contract LitlabPreStakingBox is Ownable {
         return diffTime * _amount / vestingDays; 
     }
 
-    function _getData(address _user) internal view returns (uint256 amount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) {
-        amount = balances[_user].amount;
+    function _getData(address _user) internal view returns (uint256 userAmount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) {
+        userAmount = balances[_user].amount;
         withdrawn = balances[_user].withdrawn;
         userTokensPerSec = (totalRewards / (stakeEndDate - stakeStartDate)) * balances[_user].amount / totalStakedAmount;
         lastRewardsWithdraw = balances[_user].lastRewardsWithdraw;
