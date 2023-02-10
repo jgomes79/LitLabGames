@@ -87,7 +87,7 @@ contract LitlabPreStakingBox is Ownable {
         require(balances[msg.sender].amount > 0, "NoStaked");
         require(balances[msg.sender].withdrawn == 0, "Withdrawn");
         require(block.timestamp >= stakeStartDate, "NotYet");
-        require(block.timestamp <= stakeEndDate, "NotYet");
+        require(block.timestamp <= stakeEndDate, "StakingFinished");
 
         (, , , ,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
         require(pendingRewards > 0, "NoRewardsToClaim");

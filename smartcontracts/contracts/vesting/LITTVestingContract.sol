@@ -17,9 +17,9 @@ contract LITTVestingContract is Ownable {
 
     struct VestingData {
         uint256 _amount;
-        uint256 _months;
-        uint256 _cliffMonths;
-        uint256 _TGEPercentage;
+        uint24 _TGEPercentage;
+        uint8 _months;
+        uint8 _cliffMonths;
     }
 
     mapping(VestingType => VestingData) private vestingData;
@@ -68,6 +68,15 @@ contract LITTVestingContract is Ownable {
 
     function changeWallet(address _wallet) external onlyOwner {
         wallet = _wallet;
+    }
+
+    function getVestingData(uint8 _vestingType) external view returns (uint256 amount, uint24 TGEPercentage, uint8 months, uint8 cliffMonths, uint256 withdrawn) {
+        VestingData memory data = vestingData[VestingType(_vestingType)];
+        amount = data._amount;
+        TGEPercentage = data._TGEPercentage;
+        months = data._months;
+        cliffMonths = data._cliffMonths;
+        withdrawn = withdrawnBalances[VestingType(_vestingType)];
     }
 
     function withdrawNewGames() external {
