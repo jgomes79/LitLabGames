@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
+/// @title LITTVestingContract
+/// @notice Vesting contract for LitlabGames token
 contract LITTVestingContract is Ownable {
     using SafeERC20 for IERC20;
 
@@ -12,8 +14,17 @@ contract LITTVestingContract is Ownable {
         NEW_GAMES,
         MARKETING,
         LIQUID_RESERVES,
-        AIRDROPS
+        AIRDROPS,
+        INGAME_REWARDS,
+        FARMING
     }
+
+    uint256 immutable public NEW_GAMES_AMOUNT = 690000000 * 10 ** 18;
+    uint256 immutable public MARKETING_AMOUNT = 150000000 * 10 ** 18;
+    uint256 immutable public LIQUID_RESERVES_AMOUNT = 210000000 * 10 ** 18;
+    uint256 immutable public AIRDROPS_AMOUNT = 30000000 * 10 ** 18;
+    uint256 immutable public INGAME_REWARDS_AMOUNT = 325000000 * 10 ** 18;
+    uint256 immutable public FARMING_AMOUNT = 420000000 * 10 ** 18;
 
     struct VestingData {
         uint256 _amount;
@@ -28,34 +39,35 @@ contract LITTVestingContract is Ownable {
     address public token;
     address public wallet;
     uint256 public listing_date;
-
+    
     event onWithdrawToken(address _wallet, uint256 _amount);
     event onEmergencyWithdraw();
 
+    /// @notice Set the token address, the withdraw wallet and the vesting amounts
     constructor(address _token, address _wallet) {
         token = _token;
         wallet = _wallet;
 
         vestingData[VestingType.NEW_GAMES] = VestingData({
-            _amount: 690000000 * 10 ** 18,
+            _amount: NEW_GAMES_AMOUNT,
             _months: 0,
             _cliffMonths: 12,
             _TGEPercentage: 0
         });
         vestingData[VestingType.MARKETING] = VestingData({
-            _amount: 150000000 * 10 ** 18,
+            _amount: MARKETING_AMOUNT,
             _months: 18,
             _cliffMonths: 0,
             _TGEPercentage: 5
         });
         vestingData[VestingType.LIQUID_RESERVES] = VestingData({
-            _amount: 210000000 * 10 ** 18,
+            _amount: LIQUID_RESERVES_AMOUNT,
             _months: 24,
             _cliffMonths: 0,
             _TGEPercentage: 0
         });
         vestingData[VestingType.AIRDROPS] = VestingData({
-            _amount: 210000000 * 10 ** 18,
+            _amount: AIRDROPS_AMOUNT,
             _months: 12,
             _cliffMonths: 0,
             _TGEPercentage: 10
@@ -79,9 +91,10 @@ contract LITTVestingContract is Ownable {
         withdrawn = withdrawnBalances[VestingType(_vestingType)];
     }
 
-    function withdrawNewGames() external {
-        // New Games 12-18 months cliff based on game releases
-        _executeVesting(VestingType.NEW_GAMES);
+    function withdrawNewGames(uint256 _amount) external {
+        // Free Withdraw
+        require(withdrawnBalances[VestingType.NEW_GAMES] + _amount > NEW_GAMES_AMOUNT, "Max");
+        _sendTokens(wallet, VestingType.NEW_GAMES, _amount);
     }
 
     function withdrawMarketing() external {
@@ -97,6 +110,18 @@ contract LITTVestingContract is Ownable {
     function withdrawAirdrops() external {
         // Airdrops	10% at TGE, linearly over 12 months
         _executeVesting(VestingType.AIRDROPS);
+    }
+
+    function withdrawInGameRewards(uint256 _amount) external {
+        // Free withdraw
+        require(withdrawnBalances[VestingType.INGAME_REWARDS] + _amount > INGAME_REWARDS_AMOUNT, "Max");
+        _sendTokens(wallet, VestingType.INGAME_REWARDS, _amount);
+    }
+
+    function withdrawFarming(uint256 _amount) external {
+        // Free withdraw
+        require(withdrawnBalances[VestingType.FARMING] + _amount > FARMING_AMOUNT, "Max");
+        _sendTokens(wallet, VestingType.FARMING, _amount);
     }
 
     function getTokensInVesting() external view returns(uint256) {

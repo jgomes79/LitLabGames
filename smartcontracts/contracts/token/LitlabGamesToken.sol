@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20, ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 
-contract LitlabGamesToken is ERC20 {
+/// @title LITLABGAMES ERC20 token
+/// @notice ERC20 token with gasless and burn options
+contract LitlabGamesToken is ERC20Permit {
 
-    constructor() ERC20("LitlabToken", "LITT") {  
+    constructor() ERC20("LitlabToken", "LITT") ERC20Permit("LitlabToken") {  
         _mint(msg.sender, 3000000000 * 10 ** 18);
     }
 

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
 
+// DON'T AUDIT YET. THIS SMARTCONTRACT IS NOT FINISHED YET...
 contract CyberTitansTournament is Ownable {
     using SafeERC20 for ILitlabGamesToken;
 

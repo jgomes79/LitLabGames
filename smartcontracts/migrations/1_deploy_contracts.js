@@ -14,6 +14,8 @@ async function doDeploy(deployer, network, accounts) {
     const wallets = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]];
     const amounts = [web3.utils.toWei('400000'), web3.utils.toWei('350000'), web3.utils.toWei('300000'), web3.utils.toWei('250000'), web3.utils.toWei('200000'), web3.utils.toWei('150000'), web3.utils.toWei('100000'), web3.utils.toWei('50000')];
     const investorTypes = [0,0,1,1,2,2,2,2];
+    const teamApprovalWallets = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5]];
+    const teamWallet = accounts[9];
 
     await deployer.deploy(LitlabGamesToken);
     let token = await LitlabGamesToken.deployed();
@@ -36,7 +38,7 @@ async function doDeploy(deployer, network, accounts) {
     let vesting = await LITTVestingContract.deployed();
     console.log('LITTVestingContract deployed:', vesting.address);
 
-    await deployer.deploy(LITTAdvisorsTeam, token.address);
+    await deployer.deploy(LITTAdvisorsTeam, token.address, teamWallet, teamApprovalWallets);
     let advisorsTeam = await LITTAdvisorsTeam.deployed();
     console.log('LITTAdvisorsTeam deployed:', advisorsTeam.address);
 

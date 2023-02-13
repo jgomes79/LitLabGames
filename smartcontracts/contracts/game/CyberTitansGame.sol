@@ -5,6 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
 
+/// SmartContract for CyberTitan bet modality. It's a onlyOwner SmartContract.
+/// Working mode:
+/// - This SmartContract is intended to manage the user bets in the cybertitans game
+/// - Previously, users have approved this contract to spend LitlabGames ERC20 token in the litlabgames webpage
+/// - Then, when users want to connect to the game, when matchmaking is done (8 playes), in the server, we call the functions:
+///     - checkWallets: To check that the smartcontract can get tokens from every player involved in the matchmaking
+///     - createGame: Get tokens for each player in the matchmaking
+///     - finalizeGame: When game has finished, there're only 3 winners. Split the tokens between the winners, get the platform fee and burn tokens
 contract CyberTitansGame is Ownable {
     using SafeERC20 for IERC20;
 
@@ -17,6 +25,8 @@ contract CyberTitansGame is Ownable {
     }
     mapping(uint256 => GameStruct) private games;
     uint256 gameCounter;
+
+    uint256 public maxBetAmount;
 
     address public wallet;
     address public manager;
@@ -32,10 +42,11 @@ contract CyberTitansGame is Ownable {
     event onGameFinalized(uint256 _gameId, address[] _winners);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
-    constructor(address _manager, address _wallet, address _litlabToken) {
+    constructor(address _manager, address _wallet, address _litlabToken, uint256 _maxBetAmount) {
         manager = _manager;
         wallet = _wallet;
         litlabToken = _litlabToken;
+        maxBetAmount = _maxBetAmount;
     }
 
     function changeWallets(address _manager, address _wallet, address _litlabToken) external onlyOwner {
@@ -60,6 +71,10 @@ contract CyberTitansGame is Ownable {
         waitMinutes = _waitMinutes;
     }
 
+    function updateMaxBetAmount(uint256 _maxBetAmount) external onlyOwner {
+        maxBetAmount = _maxBetAmount;
+    }
+
     function changePause() external onlyOwner {
         pause = !pause;
     }
@@ -79,10 +94,11 @@ contract CyberTitansGame is Ownable {
     }
 
     function createGame(address[] memory _players, address _token, uint256 _amount) external {
-        //require(msg.sender == manager, "OnlyManager");
+        require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_players.length > 0, "BadArray");
         require(_amount > 0, "BadAmount");
+        require(_amount <= maxBetAmount, "MaxAmount");
         require(_token != address(0), "BadToken");
 
         uint gameId = ++gameCounter;
@@ -101,12 +117,12 @@ contract CyberTitansGame is Ownable {
     }
 
     function finalizeGame(uint256 _gameId, address[] calldata _winners) external {
-        //require(msg.sender == manager, "OnlyManager");
+        require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_checkPlayers(_gameId, _winners) == true, "BadPlayers");
 
         GameStruct storage game = games[_gameId];
-        require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes");
+        require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes"); // Protection to avoid a hacker that got the private key from the server to withdraw
         require(game.endDate == 0, "AlreadyEnd");
         game.endDate = block.timestamp;
 
