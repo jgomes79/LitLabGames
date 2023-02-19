@@ -3,6 +3,7 @@ const LitlabPreStakingBox = artifacts.require("./LitlabPreStakingBox.sol");
 const LITTVestingContract = artifacts.require("./LITTVestingContract.sol");
 const LITTAdvisorsTeam = artifacts.require("./LITTAdvisorsTeam.sol");
 const CyberTitansGame = artifacts.require("./CyberTitansGame.sol");
+const CyberTitansTournament = artifacts.require("./CyberTitansTournament.sol");
 
 async function doDeploy(deployer, network, accounts) {
     const litGamesWallet = accounts[0];
@@ -42,13 +43,13 @@ async function doDeploy(deployer, network, accounts) {
     let advisorsTeam = await LITTAdvisorsTeam.deployed();
     console.log('LITTAdvisorsTeam deployed:', advisorsTeam.address);
 
-    // Send all tokens to the vesting contract
-    //const tokenSupply = await token.totalSupply();
-    //await token.transfer(vesting.address, tokenSupply);
-
-    await deployer.deploy(CyberTitansGame, accounts[0], accounts[2], token.address);
+    await deployer.deploy(CyberTitansGame, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'));
     let cyberTitansGame = await CyberTitansGame.deployed();
     console.log('CyberTitansGame deployed:', cyberTitansGame.address);
+
+    await deployer.deploy(CyberTitansTournament, accounts[0], accounts[2], token.address);
+    let cyberTitansTournament = await CyberTitansTournament.deployed();
+    console.log('CyberTitansTournament deployed:', cyberTitansTournament.address);
 }
 
 module.exports = function(deployer, network, accounts) {

@@ -5,40 +5,86 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
 
-// DON'T AUDIT YET. THIS SMARTCONTRACT IS NOT FINISHED YET...
-contract CyberTitansTournament is Ownable {
-    using SafeERC20 for ILitlabGamesToken;
+import "truffle/console.sol";
 
-    struct GameStruct {
-        address[] players;
-        uint256 totalBet;
+contract CyberTitansTournament is Ownable {
+    using SafeERC20 for IERC20;
+
+    struct TournamentStruct {
+        uint256 bet;
         address token;
-        uint256 startDate;
+        uint24 numOfPlayers;
+        uint64 startDate;
+        uint64 endDate;
     }
-    mapping(uint256 => GameStruct) private games;
-    uint256 gameCounter;
+    mapping(uint256 => TournamentStruct) private tournaments;
+    uint256 tournamentCounter;
 
     address public wallet;
     address public manager;
-    address public signer;
+    address public litlabToken;
 
     uint16[] public bets = [1, 10, 100, 500, 1000, 5000];
-    uint16[] public winners = [475, 285, 190];
+    uint32[][8] public prizes;
+    uint32[][8] public players;
+    uint32[][12] public tops;
+    uint8[8] public winners = [3, 4, 6, 8, 16, 32, 64, 128];
+
+    uint16 public rake = 25;
     uint16 public fee = 25;
     bool private pause;
 
-    event onGameCreated(uint256 _id, GameStruct _game);
+    event onTournamentCreated(uint256 _tournamentId);
+    event onTournamentFinalized(uint256 _tournamentId);
+    event onJoinedTournament(uint256 _id, address _player);
+    event onRetiredTournament(uint256 _id, address _player);
+    event onEmergencyWithdraw(uint256 _balance, address _token);
 
-    constructor(address _manager, address _signer, address _wallet) {
+    constructor(address _manager, address _wallet, address _litlabToken) {
         manager = _manager;
-        signer = _signer;
         wallet = _wallet;
+        litlabToken = _litlabToken;
+
+        _buildArrays();
     }
 
-    function changeWallets(address _manager, address _signer, address _wallet) external onlyOwner {
+    function _buildArrays() internal {
+        prizes[0] = [5000000, 3000000, 2000000];
+        prizes[1] = [4000000, 2700000, 1900000, 1400000];
+        prizes[2] = [3200000, 2200000, 1650000, 1250000, 900000, 800000];
+        prizes[3] = [2975000, 1875000, 1475000, 1125000, 850000, 700000, 550000, 450000];
+        prizes[4] = [2575000, 1705000, 1100000, 850000, 625000, 500000, 400000, 317000, 241000];
+        prizes[5] = [2000000, 1400000, 945000, 770000, 600000, 500000, 400000, 312500, 164063, 110000];
+        prizes[6] = [1825000, 1325000, 842000, 700000, 562500, 460000, 360000, 265000, 130000, 73000, 45390];
+        prizes[7] = [1780000, 1275000, 785000, 609200, 507500, 412000, 320000, 232500, 105000, 51000, 31712, 22000];
+
+        players[0] = [1,8];
+        players[1] = [9,16];
+        players[2] = [17,32];
+        players[3] = [33,64];
+        players[4] = [65,128];
+        players[5] = [129,256];
+        players[6] = [257,512];
+        players[7] = [512,1024];
+
+        tops[0] = [1,1];
+        tops[1] = [2,2];
+        tops[2] = [3,3];
+        tops[3] = [4,4];
+        tops[4] = [5,5];
+        tops[5] = [6,6];
+        tops[6] = [7,7];
+        tops[7] = [8,8];
+        tops[8] = [9,16];
+        tops[9] = [17,32];
+        tops[10] = [33,64];
+        tops[11] = [65,128];
+    }
+
+    function changeWallets(address _manager, address _wallet, address _litlabToken) external onlyOwner {
         manager = _manager;
-        signer = _signer;
         wallet = _wallet;
+        litlabToken = _litlabToken;
     }
 
     function updateBets(uint16[] memory _bets) external onlyOwner {
@@ -46,72 +92,120 @@ contract CyberTitansTournament is Ownable {
         bets = _bets;
     }
 
-    function updateFee(uint16 _fee) external onlyOwner {
+    function updateFees(uint16 _fee, uint16 _rake) external onlyOwner {
         fee = _fee;
+        rake = _rake;
+    }
+
+    function changeArrays(uint32[][8] calldata _prizes, uint32[][8] calldata _players, uint32[][12] calldata _tops, uint8[8] calldata _winners) external onlyOwner {
+        for (uint256 i=0; i<_prizes.length; i++) prizes[i] = _prizes[i];
+        for (uint256 i=0; i<_players.length; i++) players[i] = _players[i];
+        for (uint256 i=0; i<_tops.length; i++) tops[i] = _tops[i];
+        for (uint256 i=0; i<_winners.length; i++) winners[i] = _winners[i];
     }
 
     function changePause() external onlyOwner {
         pause = !pause;
     }
 
-    function startGame(address[] memory _players, address _token, uint256 _betIndex) external {
+    function createTournament(address _token, uint64 _startDate, uint16 _betIndex) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_betIndex >= 0 && _betIndex <= bets.length, "BadIndex");
 
-        uint gameId = ++gameCounter;
-        uint256 bet = bets[_betIndex] * 10 ** 18;
-            
-        games[gameId] = GameStruct({
-            players: _players,
-            totalBet: bet * _players.length,
-            token: _token,
-            startDate: block.timestamp
-        });
+        uint tournamentId = ++tournamentCounter;
+        TournamentStruct storage tournament = tournaments[tournamentId];
+        tournament.token = _token;
+        tournament.bet = uint256(bets[_betIndex]) * 10 ** 18;
+        tournament.startDate = _startDate;
 
-        for (uint256 i=0; i<=_players.length; i++) {
-            ILitlabGamesToken(_token).safeTransferFrom(_players[i], address(this), bet);
-        }
-
-        emit onGameCreated(gameId, games[gameId]);
+        emit onTournamentCreated(tournamentId);
     }
 
-    function finalizeGame(bytes calldata _message, bytes calldata _messageLen, bytes calldata _signature) external {
+    function joinTournament(uint256 _id, address _wallet, bool _isCTT) external {
+        require(msg.sender == manager, "OnlyManager");
+        require(pause == false, "Paused");
+        require(players[_id][_wallet] == false, "InList");
+
+        TournamentStruct storage tournament = tournaments[_id];
+        if (tournament.startDate > 0) require(block.timestamp >= tournament.startDate, "NotStarted");
+        if (tournament.endDate > 0) require(block.timestamp <= tournament.endDate, "Ended");
+        
+        tournament.numOfPlayers++;
+        if (_isCTT) IERC20(tournament.token).safeTransferFrom(wallet, address(this), tournament.bet);
+        else IERC20(tournament.token).safeTransferFrom(_wallet, address(this), tournament.bet);
+
+        emit onJoinedTournament(_id, msg.sender);
+    }
+
+    function getTournament(uint256 _id) external view returns(TournamentStruct memory) {
+        return tournaments[_id];
+    }
+
+    function retireFromTournament(uint256 _id, address _wallet) external {
+        require(msg.sender == manager, "OnlyManager");
+        require(pause == false, "Paused");
+        
+        TournamentStruct memory tournament = tournaments[_tournamentId];
+        IERC20(tournament.token).safeTransfer(_wallet, tournament.bet);
+
+        emit onRetiredTournament(_id, msg.sender);
+    }
+
+    function finalizeTournament(uint256 _tournamentId, address[] calldata _winners) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
 
-        (uint256 gameId, address winner1, address winner2, address winner3) = abi.decode(_message,(uint256, address, address, address));
-        address _signer = _decodeSignature(_message, _messageLen, _signature);
-        require(_signer == signer, "BadSigner");
+        TournamentStruct memory tournament = tournaments[_tournamentId];
+        uint256 index = _getPrizesColumn(tournament.numOfPlayers);
+        require(winners[index] == _winners.length, "BadWinners");
 
-        GameStruct memory game = games[gameId];
-        require(block.timestamp >= game.startDate + 10 minutes, "Wait10Minutes");
+        uint256 totalBet = tournament.bet * tournament.numOfPlayers;
+        uint256 _rake = totalBet * rake / 1000;
+        uint256 _fee = totalBet * fee / 1000;
 
-        ILitlabGamesToken(game.token).safeTransfer(winner1, game.totalBet * winners[0] / 1000);
-        ILitlabGamesToken(game.token).safeTransfer(winner2, game.totalBet * winners[1] / 1000);
-        ILitlabGamesToken(game.token).safeTransfer(winner3, game.totalBet * winners[2] / 1000);
+        uint256 pot = totalBet - (_rake + _fee);
 
-        ILitlabGamesToken(game.token).burn(game.totalBet * fee / 1000);
-        ILitlabGamesToken(game.token).safeTransfer(wallet, game.totalBet * fee / 1000);
-    }
+        uint8 i;
+        do {
+            uint256 prizePercentage = _getPrize(index, i+1);
+            uint256 prize = (pot * prizePercentage) / (10 ** 7);
+            if (prize != 0) IERC20(tournament.token).safeTransfer(_winners[i], prize);
+            ++i;
+        } while(i<_winners.length);
 
-    function _decodeSignature(bytes memory _message, bytes memory _messageLength, bytes memory _signature) internal pure returns (address) {
-        if (_signature.length != 65) return (address(0));
-
-        bytes32 messageHash = keccak256(abi.encodePacked(hex"19457468657265756d205369676e6564204d6573736167653a0a", _messageLength, _message));
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
-        assembly {
-            r := mload(add(_signature, 0x20))
-            s := mload(add(_signature, 0x40))
-            v := byte(0, mload(add(_signature, 0x60)))
+        if (tournament.token == litlabToken) {
+            ILitlabGamesToken(tournament.token).burn(_rake);
+            IERC20(tournament.token).safeTransfer(wallet, _fee);
+        } else {
+            IERC20(tournament.token).safeTransfer(wallet, (_rake + _fee));
         }
 
-        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) return address(0);
-        if (v != 27 && v != 28) return address(0);
-        
-        return ecrecover(messageHash, v, r, s);
+        emit onTournamentFinalized(_tournamentId);
+    }
+
+    function _getPrizesColumn(uint24 _numOfPlayers) internal view returns(uint16) {
+        uint16 index;
+        do {
+            if (_numOfPlayers >= players[index][0] && _numOfPlayers <= players[index][1]) return index;
+            index++;
+        } while (index < 8);
+    
+        assert(index >= 8);
+    }
+
+    function _getPrize(uint256 _index, uint256 _position) internal view returns(uint32) {
+        uint8 index;
+        do {
+            if (_position >= tops[index][0] && _position <= tops[index][1]) return prizes[_index][index];
+            ++index;
+        } while(index < 12);
+    }
+
+    function emergencyWithdraw(address _token) external onlyOwner {
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).safeTransfer(msg.sender, balance);
+
+        emit onEmergencyWithdraw(balance, _token);
     }
 }

@@ -20,8 +20,8 @@ contract CyberTitansGame is Ownable {
         address[] players;
         uint256 totalBet;
         address token;
-        uint256 startDate;
-        uint256 endDate;
+        uint64 startDate;
+        uint64 endDate;
     }
     mapping(uint256 => GameStruct) private games;
     uint256 gameCounter;
@@ -107,7 +107,7 @@ contract CyberTitansGame is Ownable {
             players: _players,
             totalBet: _amount * _players.length,
             token: _token,
-            startDate: block.timestamp,
+            startDate: uint64(block.timestamp),
             endDate: 0
         });
 
@@ -124,7 +124,7 @@ contract CyberTitansGame is Ownable {
         GameStruct storage game = games[_gameId];
         require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes"); // Protection to avoid a hacker that got the private key from the server to withdraw
         require(game.endDate == 0, "AlreadyEnd");
-        game.endDate = block.timestamp;
+        game.endDate = uint64(block.timestamp);
 
         for (uint256 i=0; i<_winners.length; i++) IERC20(game.token).safeTransfer(_winners[i], game.totalBet * winners[i] / 1000);
 
