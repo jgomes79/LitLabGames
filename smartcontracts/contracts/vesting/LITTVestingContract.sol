@@ -74,14 +74,17 @@ contract LITTVestingContract is Ownable {
         });
     }
 
+    /// @notice Set TGE date (listing date)
     function setListingDate(uint256 _listingDate) external onlyOwner {
         listing_date = _listingDate;
     }
 
+    /// @notice Change the Company wallet
     function changeWallet(address _wallet) external onlyOwner {
         wallet = _wallet;
     }
 
+    /// @notice Get vesting data
     function getVestingData(uint8 _vestingType) external view returns (uint256 amount, uint24 TGEPercentage, uint8 months, uint8 cliffMonths, uint256 withdrawn) {
         VestingData memory data = vestingData[VestingType(_vestingType)];
         amount = data._amount;
@@ -91,43 +94,51 @@ contract LITTVestingContract is Ownable {
         withdrawn = withdrawnBalances[VestingType(_vestingType)];
     }
 
+    /// @notice Withdraw from New Games pool (not vested)
     function withdrawNewGames(uint256 _amount) external {
         // Free Withdraw
         require(withdrawnBalances[VestingType.NEW_GAMES] + _amount > NEW_GAMES_AMOUNT, "Max");
         _sendTokens(wallet, VestingType.NEW_GAMES, _amount);
     }
 
+    /// @notice Withdraw from Marketing pool (vested)
     function withdrawMarketing() external {
         // Marketing 5% at TGE, linearly over 18 months
         _executeVesting(VestingType.MARKETING);
     }
 
+    /// @notice Withdraw from Liquid reserves pool (vested)
     function withdrawLiquidReserves() external {
         // Liquid ReservesVesting linearly over 24 months
         _executeVesting(VestingType.LIQUID_RESERVES);
     }
 
+    /// @notice Withdraw from Airdrops pool (vested)
     function withdrawAirdrops() external {
         // Airdrops	10% at TGE, linearly over 12 months
         _executeVesting(VestingType.AIRDROPS);
     }
 
+    /// @notice Withdraw from InGame pool (not vested)
     function withdrawInGameRewards(uint256 _amount) external {
         // Free withdraw
         require(withdrawnBalances[VestingType.INGAME_REWARDS] + _amount > INGAME_REWARDS_AMOUNT, "Max");
         _sendTokens(wallet, VestingType.INGAME_REWARDS, _amount);
     }
 
+    /// @notice Withdraw from Farming pool (not vested)
     function withdrawFarming(uint256 _amount) external {
         // Free withdraw
         require(withdrawnBalances[VestingType.FARMING] + _amount > FARMING_AMOUNT, "Max");
         _sendTokens(wallet, VestingType.FARMING, _amount);
     }
 
+    /// @notice Get the tokens in the contract
     function getTokensInVesting() external view returns(uint256) {
         return IERC20(token).balanceOf(address(this));
     }
 
+    /// @notice If there's any problem, contract owner can withdraw all funds
     function emergencyWithdraw() external onlyOwner {
         uint256 balance = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransfer(msg.sender, balance);
@@ -135,6 +146,7 @@ contract LITTVestingContract is Ownable {
         emit onEmergencyWithdraw();
     }
 
+    /// @notice Internal function to calculate the amount of tokens user can get according the vesting
     function _executeVesting(VestingType _vestingType) internal {
         VestingData memory data = vestingData[_vestingType];
         require(block.timestamp >= listing_date + (data._cliffMonths * 30 days), "TooEarly");

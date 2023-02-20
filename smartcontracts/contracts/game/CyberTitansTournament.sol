@@ -5,8 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
 
-import "truffle/console.sol";
-
+/// SmartContract for CyberTitans game modality. It's a centralized SmartContract.
+/// Working mode:
+/// - This SmartContract is intended to manage the user tournament join, retirement and distribute prizes
+/// - Previously, users have approved this contract to spend LitlabGames ERC20 token in the litlabgames webpage
+/// - Then, when users want to connect to the game, when matchmaking is done (8 playes), in the server, we call the functions:
+///     - createTournament: To create a new tournament. Returns a tournament id
+///     - joinTournament: To join a new user to a tournament
+///     - retireTournament: To retire a user from a tournament
+///     - finalizeTournament: When tournament has finished, send the winner wallets and distribute the prizes according the prizes matrix
 contract CyberTitansTournament is Ownable {
     using SafeERC20 for IERC20;
 
@@ -19,6 +26,9 @@ contract CyberTitansTournament is Ownable {
     }
     mapping(uint256 => TournamentStruct) private tournaments;
     uint256 tournamentCounter;
+
+    uint256 public maxBetAmount;                    // Security. Don't let create a game with a bet greater than this variable
+    uint16 public penalty;                          // If the user joint to a tournament and wants to retire before starting, there's a penalty he has to pay.
 
     address public wallet;
     address public manager;
@@ -40,10 +50,12 @@ contract CyberTitansTournament is Ownable {
     event onRetiredTournament(uint256 _id, address _player);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
-    constructor(address _manager, address _wallet, address _litlabToken) {
+    constructor(address _manager, address _wallet, address _litlabToken, uint256 _maxBetAmount, uint8 _penalty) {
         manager = _manager;
         wallet = _wallet;
         litlabToken = _litlabToken;
+        maxBetAmount = _maxBetAmount;
+        penalty = _penalty;
 
         _buildArrays();
     }
@@ -87,14 +99,10 @@ contract CyberTitansTournament is Ownable {
         litlabToken = _litlabToken;
     }
 
-    function updateBets(uint16[] memory _bets) external onlyOwner {
-        delete bets;
-        bets = _bets;
-    }
-
-    function updateFees(uint16 _fee, uint16 _rake) external onlyOwner {
+    function updateFees(uint16 _fee, uint16 _rake, uint16 _penalty) external onlyOwner {
         fee = _fee;
         rake = _rake;
+        penalty = _penalty;
     }
 
     function changeArrays(uint32[][8] calldata _prizes, uint32[][8] calldata _players, uint32[][12] calldata _tops, uint8[8] calldata _winners) external onlyOwner {
@@ -108,15 +116,17 @@ contract CyberTitansTournament is Ownable {
         pause = !pause;
     }
 
-    function createTournament(address _token, uint64 _startDate, uint16 _betIndex) external {
+    function createTournament(address _token, uint64 _startDate, uint256 _amount) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
-        require(_betIndex >= 0 && _betIndex <= bets.length, "BadIndex");
+        require(_amount != 0, "BadAmount");
+        require(_amount <= maxBetAmount, "MaxAmount");
+        require(_token != address(0), "BadToken");
 
         uint tournamentId = ++tournamentCounter;
         TournamentStruct storage tournament = tournaments[tournamentId];
         tournament.token = _token;
-        tournament.bet = uint256(bets[_betIndex]) * 10 ** 18;
+        tournament.bet = _amount;
         tournament.startDate = _startDate;
 
         emit onTournamentCreated(tournamentId);
@@ -125,7 +135,6 @@ contract CyberTitansTournament is Ownable {
     function joinTournament(uint256 _id, address _wallet, bool _isCTT) external {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
-        require(players[_id][_wallet] == false, "InList");
 
         TournamentStruct storage tournament = tournaments[_id];
         if (tournament.startDate > 0) require(block.timestamp >= tournament.startDate, "NotStarted");
@@ -146,8 +155,9 @@ contract CyberTitansTournament is Ownable {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         
-        TournamentStruct memory tournament = tournaments[_tournamentId];
-        IERC20(tournament.token).safeTransfer(_wallet, tournament.bet);
+        // TODO. Pending of decision
+        TournamentStruct memory tournament = tournaments[_id];
+        IERC20(tournament.token).safeTransfer(_wallet, (tournament.bet - (tournament.bet * penalty / 1000)));
 
         emit onRetiredTournament(_id, msg.sender);
     }
@@ -187,19 +197,23 @@ contract CyberTitansTournament is Ownable {
     function _getPrizesColumn(uint24 _numOfPlayers) internal view returns(uint16) {
         uint16 index;
         do {
-            if (_numOfPlayers >= players[index][0] && _numOfPlayers <= players[index][1]) return index;
-            index++;
+            if (_numOfPlayers >= players[index][0] && _numOfPlayers <= players[index][1]) break;
+            ++index;
         } while (index < 8);
     
-        assert(index >= 8);
+        assert(index < 8);
+        return index;
     }
 
     function _getPrize(uint256 _index, uint256 _position) internal view returns(uint32) {
         uint8 index;
         do {
-            if (_position >= tops[index][0] && _position <= tops[index][1]) return prizes[_index][index];
+            if (_position >= tops[index][0] && _position <= tops[index][1]) break;
             ++index;
         } while(index < 12);
+
+        assert(index < 12);
+        return prizes[_index][index];
     }
 
     function emergencyWithdraw(address _token) external onlyOwner {

@@ -47,7 +47,7 @@ async function doDeploy(deployer, network, accounts) {
     let cyberTitansGame = await CyberTitansGame.deployed();
     console.log('CyberTitansGame deployed:', cyberTitansGame.address);
 
-    await deployer.deploy(CyberTitansTournament, accounts[0], accounts[2], token.address);
+    await deployer.deploy(CyberTitansTournament, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'), 50);
     let cyberTitansTournament = await CyberTitansTournament.deployed();
     console.log('CyberTitansTournament deployed:', cyberTitansTournament.address);
 }

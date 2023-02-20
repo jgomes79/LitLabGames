@@ -16,7 +16,7 @@ async function doDeploy(deployer, network, accounts) {
     }
 
     const startDate = Math.round(new Date('2023-01-01T00:00:00').getTime() / 1000);
-    const tx = await cyberTitansTournament.createTournament(token.address, startDate, 2);
+    const tx = await cyberTitansTournament.createTournament(token.address, startDate, web3.utils.toWei('1000'));
     const tournamentId = tx.logs[0].args._tournamentId;
 
     await cyberTitansTournament.joinTournament(tournamentId, accounts[1], false, {from: manager});

@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
-/// @title PRESTAKING BOX
+/// PRESTAKING BOX
 /// @notice Staking contract for investors. At deployement we send all the tokens for each investor to this contract with a plus amount of rewards
 contract LitlabPreStakingBox is Ownable {
     using SafeERC20 for IERC20;
@@ -172,6 +172,7 @@ contract LitlabPreStakingBox is Ownable {
         return diffTime * _amount / vestingDays; 
     }
 
+    /// Return contract data needed in the frontend
     function _getData(address _user) internal view returns (uint256 userAmount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) {
         userAmount = balances[_user].amount;
         withdrawn = balances[_user].withdrawn;
