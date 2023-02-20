@@ -92,6 +92,7 @@ async function withdraw(from, now) {
 }
 
 async function doDeploy(deployer, network, accounts) {
+    /*
     let token = await LitlabGamesToken.deployed();
     console.log('LitlabGamesToken deployed:', token.address);
 
@@ -135,6 +136,7 @@ async function doDeploy(deployer, network, accounts) {
         tokensAccount = await token.balanceOf(accounts[8]);
         console.log('Accounts8 tokens: ', web3.utils.fromWei(tokensAccount.toString(),'ether'));
     }
+    */
 }
 
 module.exports = function(deployer, network, accounts) {

@@ -48,6 +48,7 @@ async function increaseTo (target) {
 }
 
 async function doDeploy(deployer, network, accounts) {
+    /*
     let token = await LitlabGamesToken.at('0x21d5f348C0F3bFc60f9aa9148284B001a50eF538');
     console.log('LitlabGamesToken deployed:', token.address);
 
@@ -78,6 +79,7 @@ async function doDeploy(deployer, network, accounts) {
 
     const tokensAccount = await token.balanceOf(accounts[0]);
     console.log('Tokens recoverd account: ', web3.utils.fromWei(tokensAccount,'ether'));
+    */
 }
 
 module.exports = function(deployer, network, accounts) {

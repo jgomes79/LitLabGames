@@ -34,7 +34,6 @@ contract CyberTitansTournament is Ownable {
     address public manager;
     address public litlabToken;
 
-    uint16[] public bets = [1, 10, 100, 500, 1000, 5000];
     uint32[][8] public prizes;
     uint32[][8] public players;
     uint32[][12] public tops;
