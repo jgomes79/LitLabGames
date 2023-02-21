@@ -35,6 +35,7 @@ contract LITTVestingContract is Ownable {
 
     mapping(VestingType => VestingData) private vestingData;
     mapping(VestingType => uint256) public withdrawnBalances;
+    mapping(VestingType => uint256) public lastWithdraw;
 
     address public token;
     address public wallet;
@@ -97,7 +98,7 @@ contract LITTVestingContract is Ownable {
     /// @notice Withdraw from New Games pool (not vested)
     function withdrawNewGames(uint256 _amount) external {
         // Free Withdraw
-        require(withdrawnBalances[VestingType.NEW_GAMES] + _amount > NEW_GAMES_AMOUNT, "Max");
+        require(withdrawnBalances[VestingType.NEW_GAMES] + _amount <= NEW_GAMES_AMOUNT, "Max");
         _sendTokens(wallet, VestingType.NEW_GAMES, _amount);
     }
 
@@ -122,14 +123,14 @@ contract LITTVestingContract is Ownable {
     /// @notice Withdraw from InGame pool (not vested)
     function withdrawInGameRewards(uint256 _amount) external {
         // Free withdraw
-        require(withdrawnBalances[VestingType.INGAME_REWARDS] + _amount > INGAME_REWARDS_AMOUNT, "Max");
+        require(withdrawnBalances[VestingType.INGAME_REWARDS] + _amount <= INGAME_REWARDS_AMOUNT, "Max");
         _sendTokens(wallet, VestingType.INGAME_REWARDS, _amount);
     }
 
     /// @notice Withdraw from Farming pool (not vested)
     function withdrawFarming(uint256 _amount) external {
         // Free withdraw
-        require(withdrawnBalances[VestingType.FARMING] + _amount > FARMING_AMOUNT, "Max");
+        require(withdrawnBalances[VestingType.FARMING] + _amount <= FARMING_AMOUNT, "Max");
         _sendTokens(wallet, VestingType.FARMING, _amount);
     }
 
@@ -156,17 +157,20 @@ contract LITTVestingContract is Ownable {
             uint256 amountToWithdraw = data._TGEPercentage * data._amount / 100;
             _sendTokens(wallet, _vestingType, amountToWithdraw);
         } else {
-            uint256 start = listing_date + (data._cliffMonths * 30 days);
-            uint256 end = start + (data._months * 30 days);
+            uint256 start = lastWithdraw[_vestingType] == 0 ? listing_date + (data._cliffMonths * 30 days) : lastWithdraw[_vestingType];
+            uint256 end = listing_date + (data._cliffMonths * 30 days) + (uint256(data._months) * 30 days);
+            uint256 to = block.timestamp > end ? end : block.timestamp;
             uint256 tokensPerSecond = data._amount / (end - start);
-            uint256 amountToWithdraw = ((block.timestamp - start) * tokensPerSecond) - withdrawnBalances[_vestingType];
+            uint256 amountToWithdraw = (to - start) * tokensPerSecond;
             if (amountToWithdraw > data._amount - withdrawnBalances[_vestingType]) amountToWithdraw = data._amount - withdrawnBalances[_vestingType];
+
             _sendTokens(wallet, _vestingType, amountToWithdraw);
         }
     }
 
     function _sendTokens(address _wallet, VestingType _vestingType, uint256 _amount) internal {
         withdrawnBalances[_vestingType] += _amount;
+        lastWithdraw[_vestingType] = block.timestamp;
         IERC20(token).safeTransfer(_wallet, _amount);
 
         emit onWithdrawToken(_wallet, _amount);

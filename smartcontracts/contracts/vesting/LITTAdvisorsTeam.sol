@@ -73,9 +73,11 @@ contract LITTAdvisorsTeam is Ownable {
 
         uint256 start = listing_date + 90 days;
         uint256 end = start + (24 * 30 days);
+        uint256 to = block.timestamp > end ? end : block.timestamp;
         uint256 tokensPerSecond = ADVISORS_AMOUNT / (end - start);
-        uint256 amountToWithdraw = ((block.timestamp - start) * tokensPerSecond) - advisorsWithdrawn[msg.sender];
+        uint256 amountToWithdraw = ((to - start) * tokensPerSecond) - advisorsWithdrawn[msg.sender];
         if (amountToWithdraw > advisors[msg.sender] - advisorsWithdrawn[msg.sender]) amountToWithdraw = advisors[msg.sender] - advisorsWithdrawn[msg.sender];
+        
         advisorsWithdrawn[msg.sender] += amountToWithdraw;
         IERC20(token).safeTransfer(msg.sender, amountToWithdraw);
 
@@ -101,13 +103,15 @@ contract LITTAdvisorsTeam is Ownable {
         require(TEAM_AMOUNT - teamWithdrawn > 0, "NotAllowed");
     
         numTeamApprovals = 0;
-        for (uint256 i=0; i<approvalWallets.length; i++) teamApprovals[approvalWallets[i]] = false;
+        for (uint256 i=0; i<approvalWallets.length; i++) delete teamApprovals[approvalWallets[i]];
         
         uint256 start = listing_date + 180 days;
         uint256 end = start + (42 * 30 days);
+        uint256 to = block.timestamp > end ? end : block.timestamp;
         uint256 tokensPerSecond = TEAM_AMOUNT / (end - start);
-        uint256 amountToWithdraw = ((block.timestamp - start) * tokensPerSecond) - teamWithdrawn;
+        uint256 amountToWithdraw = ((to - start) * tokensPerSecond) - teamWithdrawn;
         if (amountToWithdraw > TEAM_AMOUNT - teamWithdrawn) amountToWithdraw = TEAM_AMOUNT - teamWithdrawn;
+        
         teamWithdrawn += amountToWithdraw;
         IERC20(token).safeTransfer(teamWallet, amountToWithdraw);
 

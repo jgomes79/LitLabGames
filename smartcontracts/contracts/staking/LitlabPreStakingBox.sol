@@ -4,8 +4,6 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
-import "truffle/console.sol";
-
 /// PRESTAKING BOX
 /// @notice Staking contract for investors. At deployement we send all the tokens for each investor to this contract with a plus amount of rewards
 contract LitlabPreStakingBox is Ownable {
@@ -171,11 +169,9 @@ contract LitlabPreStakingBox is Ownable {
 
         uint256 amountMinusFirstWithdraw = balances[_user].amount - (balances[_user].amount * 15 / 100);
         uint256 tokensPerSec = amountMinusFirstWithdraw / vestingDays;
-        console.log("tokensPerSec: %o", tokensPerSec);
 
         uint256 from = balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn;
         uint256 to = block.timestamp > stakeStartDate + vestingDays ? stakeStartDate + vestingDays : block.timestamp;
-
         uint256 diffTime = from <= to ? to - from : 0;
         uint256 tokens = diffTime * tokensPerSec;
         if (balances[_user].amount - balances[_user].withdrawn < tokens) tokens = balances[_user].amount - balances[_user].withdrawn;
@@ -196,11 +192,6 @@ contract LitlabPreStakingBox is Ownable {
         if (totalStakedAmount > 0) {
             rewardsTokensPerSec = (totalRewards * (balances[_user].amount / 10 ** 18)) / ((stakeEndDate - stakeStartDate) * (totalStakedAmount / 10 ** 18));
             pendingRewards = balances[_user].withdrawnFirst == false ? (to - from) * rewardsTokensPerSec : 0;
-
-            console.log("rewardsTokensPerSec: %o", rewardsTokensPerSec);
-            console.log("pendingRewards: %o", pendingRewards);
-            console.log("from: %o", from);
-            console.log("to: %o", to);
         }
     }
 }

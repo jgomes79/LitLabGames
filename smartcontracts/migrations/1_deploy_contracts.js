@@ -11,6 +11,7 @@ async function doDeploy(deployer, network, accounts) {
     const stakingEnd = Math.round(new Date('2026-01-01T00:00:00').getTime() / 1000);
     const totalRewards = web3.utils.toWei('1000000');
     const stakersAmount = web3.utils.toWei('1800000');
+    const vestingAmount = web3.utils.toWei('1825000000')
 
     const wallets = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]];
     const amounts = [web3.utils.toWei('400000'), web3.utils.toWei('350000'), web3.utils.toWei('300000'), web3.utils.toWei('250000'), web3.utils.toWei('200000'), web3.utils.toWei('150000'), web3.utils.toWei('100000'), web3.utils.toWei('50000')];
@@ -34,10 +35,16 @@ async function doDeploy(deployer, network, accounts) {
 
     await token.transfer(preStakingBox.address, stakersAmount);
     console.log(`Sended ${web3.utils.fromWei(stakersAmount,'ether')} to the PreStakingBox as StakersBalance`);
-/*
+
     await deployer.deploy(LITTVestingContract, token.address, litGamesWallet);
     let vesting = await LITTVestingContract.deployed();
     console.log('LITTVestingContract deployed:', vesting.address);
+
+    await token.transfer(vesting.address, vestingAmount);
+    console.log(`Sended ${web3.utils.fromWei(vestingAmount,'ether')} to the Vesting`);
+
+    await vesting.setListingDate(stakingStart);
+    console.log('Vesting listing date --> SET');
 
     await deployer.deploy(LITTAdvisorsTeam, token.address, teamWallet, teamApprovalWallets);
     let advisorsTeam = await LITTAdvisorsTeam.deployed();
@@ -50,7 +57,6 @@ async function doDeploy(deployer, network, accounts) {
     await deployer.deploy(CyberTitansTournament, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'), 50);
     let cyberTitansTournament = await CyberTitansTournament.deployed();
     console.log('CyberTitansTournament deployed:', cyberTitansTournament.address);
-*/
 }
 
 module.exports = function(deployer, network, accounts) {
