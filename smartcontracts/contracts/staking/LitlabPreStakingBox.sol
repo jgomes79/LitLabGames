@@ -169,14 +169,16 @@ contract LitlabPreStakingBox is Ownable {
         else if (investorType == InvestorType.SEED) vestingDays = 30 * 30 days;
         else if (investorType == InvestorType.STRATEGIC) vestingDays = 24 * 30 days;
 
-        uint256 tokensPerSec = (balances[_user].amount - (balances[_user].amount * 15 / 100)) / vestingDays;
+        uint256 amountMinusFirstWithdraw = balances[_user].amount - (balances[_user].amount * 15 / 100);
+        uint256 tokensPerSec = amountMinusFirstWithdraw / vestingDays;
         console.log("tokensPerSec: %o", tokensPerSec);
-        uint256 diffTime = (block.timestamp > stakeStartDate + vestingDays ? stakeStartDate + vestingDays : block.timestamp) - (balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn);
-        console.log("diffTime: %o", diffTime);
+
+        uint256 from = balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn;
+        uint256 to = block.timestamp > stakeStartDate + vestingDays ? stakeStartDate + vestingDays : block.timestamp;
+
+        uint256 diffTime = from <= to ? to - from : 0;
         uint256 tokens = diffTime * tokensPerSec;
-        console.log("tokens: %o", tokens);
         if (balances[_user].amount - balances[_user].withdrawn < tokens) tokens = balances[_user].amount - balances[_user].withdrawn;
-        console.log("tokens 2: %o", tokens);
 
         return tokens;
     }

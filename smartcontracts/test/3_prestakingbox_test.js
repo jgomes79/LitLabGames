@@ -113,8 +113,6 @@ const printUsersBalance = async (accounts) => {
     console.log('Accounts8 tokens: ', web3.utils.fromWei(tokensAccount.toString(),'ether'));
 }
 
-let accounts = null;
-
 contract("LitlabPreStakingBox tests", async(accounts) => {
 
     it("1. Everybody should withdraw initial 15% without penalties", async () => {
@@ -138,15 +136,13 @@ contract("LitlabPreStakingBox tests", async(accounts) => {
         await increaseTo(oneMonthLater);
 
         await withdrawRewards(accounts[1], oneMonthLater);
-        /*
         await withdrawRewards(accounts[2], oneMonthLater);
         await withdrawRewards(accounts[3], oneMonthLater);
         await withdrawRewards(accounts[4], oneMonthLater);
         await withdrawRewards(accounts[5], oneMonthLater);
         await withdrawRewards(accounts[6], oneMonthLater);
-        await withdraw(accounts[7], oneMonthLater);
+        await withdrawRewards(accounts[7], oneMonthLater);
         await withdrawRewards(accounts[8], oneMonthLater);
-        */
         // TODO. Asserts and console.logs
 
         await printUsersBalance(accounts);
@@ -162,15 +158,13 @@ contract("LitlabPreStakingBox tests", async(accounts) => {
             console.log('PRESTAKING BOX SIMULATION: ', new Date(startTime*1000).toISOString());
     
             await withdrawRewards(accounts[1], startTime);
-            /*
-            await withdraw(accounts[2], startTime);
-            await withdraw(accounts[3], startTime);
-            await withdraw(accounts[4], startTime);
-            await withdraw(accounts[5], startTime);
-            await withdraw(accounts[6], startTime);
-            await withdraw(accounts[7], startTime);
-            await withdraw(accounts[8], startTime);
-            */
+            await withdrawRewards(accounts[2], startTime);
+            await withdrawRewards(accounts[3], startTime);
+            await withdrawRewards(accounts[4], startTime);
+            await withdrawRewards(accounts[5], startTime);
+            await withdrawRewards(accounts[6], startTime);
+            await withdrawRewards(accounts[7], startTime);
+            await withdrawRewards(accounts[8], startTime);
     
             let tokensLeft = await preStakingBox.getTokensInContract();
             console.log('TOKENS LEFT IN CONTRACT: ', web3.utils.fromWei(tokensLeft.toString(),'ether'));   
