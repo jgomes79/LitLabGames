@@ -34,7 +34,7 @@ async function doDeploy(deployer, network, accounts) {
 
     await token.transfer(preStakingBox.address, stakersAmount);
     console.log(`Sended ${web3.utils.fromWei(stakersAmount,'ether')} to the PreStakingBox as StakersBalance`);
-
+/*
     await deployer.deploy(LITTVestingContract, token.address, litGamesWallet);
     let vesting = await LITTVestingContract.deployed();
     console.log('LITTVestingContract deployed:', vesting.address);
@@ -50,6 +50,7 @@ async function doDeploy(deployer, network, accounts) {
     await deployer.deploy(CyberTitansTournament, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'), 50);
     let cyberTitansTournament = await CyberTitansTournament.deployed();
     console.log('CyberTitansTournament deployed:', cyberTitansTournament.address);
+*/
 }
 
 module.exports = function(deployer, network, accounts) {

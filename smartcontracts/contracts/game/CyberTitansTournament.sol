@@ -157,6 +157,7 @@ contract CyberTitansTournament is Ownable {
         // TODO. Pending of decision
         TournamentStruct memory tournament = tournaments[_id];
         IERC20(tournament.token).safeTransfer(_wallet, (tournament.bet - (tournament.bet * penalty / 1000)));
+        IERC20(tournament.token).safeTransfer(wallet, (tournament.bet * penalty / 1000));
 
         emit onRetiredTournament(_id, msg.sender);
     }

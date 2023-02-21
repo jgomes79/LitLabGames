@@ -18,7 +18,8 @@ contract LitlabPreStakingBox is Ownable {
     struct UserStake {
         uint256 amount;
         uint256 withdrawn;
-        uint256 lastRewardsWithdraw;
+        uint256 lastRewardsWithdrawn;
+        uint256 lastUserWithdrawn;
         InvestorType investorType;
         bool claimedInitial;
         bool withdrawnFirst;
@@ -67,7 +68,8 @@ contract LitlabPreStakingBox is Ownable {
             balances[user] = UserStake({
                 amount: amount,
                 withdrawn: 0,
-                lastRewardsWithdraw: 0,
+                lastRewardsWithdrawn: 0,
+                lastUserWithdrawn: 0,
                 investorType: investorType,
                 claimedInitial: false,
                 withdrawnFirst: false
@@ -82,7 +84,7 @@ contract LitlabPreStakingBox is Ownable {
     /// @notice At TGE users can withdraw the 15% of their investment. Only one time
     function withdrawInitial() external {
         require(block.timestamp >= stakeStartDate, "NotTGE");
-        require(balances[msg.sender].amount > 0, "NoStaked");
+        require(balances[msg.sender].amount != 0, "NoStaked");
         require(balances[msg.sender].claimedInitial == false, "Claimed");
 
         uint256 amount = balances[msg.sender].amount * 15 / 100;
@@ -96,15 +98,15 @@ contract LitlabPreStakingBox is Ownable {
 
     /// @notice Users can withdraw rewards whenever they want with no penalty only if they don't withdraw previously
     function withdrawRewards() external {
-        require(balances[msg.sender].amount > 0, "NoStaked");
-        require(balances[msg.sender].withdrawn == 0, "Withdrawn");
+        require(balances[msg.sender].amount != 0, "NoStaked");
+        require(balances[msg.sender].withdrawnFirst == false, "Withdrawn");
         require(block.timestamp >= stakeStartDate, "NotYet");
         require(block.timestamp <= stakeEndDate, "StakingFinished");
 
-        (, , , ,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
+        (, , , , , , uint256 pendingRewards, uint256 to) = _getData(msg.sender);
         require(pendingRewards > 0, "NoRewardsToClaim");
 
-        balances[msg.sender].lastRewardsWithdraw = to;
+        balances[msg.sender].lastRewardsWithdrawn = to;
         IERC20(token).safeTransfer(msg.sender, pendingRewards);
 
         emit onWithdrawRewards(msg.sender, pendingRewards);
@@ -115,34 +117,33 @@ contract LitlabPreStakingBox is Ownable {
         require(balances[msg.sender].amount > 0, "NoStaked");
         require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "Max");
 
-        uint256 amount = 0;
-        uint256 rewards = 0;
+        (uint256 userAmount, , , , , , uint256 pendingRewards, uint256 to) = _getData(msg.sender);
+        uint256 tokensToSend = 0;
         if (balances[msg.sender].withdrawnFirst == false) {
-            // It's the first time we use a regular withdraw. Calculate the pending rewards and send to the user.
-            (uint256 userAmount, uint256 withdrawn, , ,  uint256 pendingRewards, uint256 to) = _getData(msg.sender);
             // This is the last time this user can get rewards, and the rest of the rewards are splitted for the other users.
             totalStakedAmount -= userAmount;
             totalRewards -= pendingRewards;
 
-            uint256 tokens = _calculateTokens(balances[msg.sender].investorType, userAmount) - withdrawn;
+            uint256 tokens = _calculateTokens(msg.sender);
             balances[msg.sender].withdrawn += tokens;
-            balances[msg.sender].lastRewardsWithdraw = to;
+            balances[msg.sender].lastUserWithdrawn = to;
             balances[msg.sender].withdrawnFirst = true;
 
-            IERC20(token).safeTransfer(msg.sender, tokens + pendingRewards);
+            tokensToSend = tokens + pendingRewards;
+            IERC20(token).safeTransfer(msg.sender, tokensToSend);
         } else {
-            amount = balances[msg.sender].amount;
-            uint256 tokens = _calculateTokens(balances[msg.sender].investorType, amount) - balances[msg.sender].withdrawn;
-            balances[msg.sender].withdrawn += tokens;
+            tokensToSend = _calculateTokens(msg.sender);
+            balances[msg.sender].withdrawn += tokensToSend;
+            balances[msg.sender].lastUserWithdrawn = to;
 
-            IERC20(token).safeTransfer(msg.sender, tokens);
+            IERC20(token).safeTransfer(msg.sender, tokensToSend);
         }
 
-        emit onWithdraw(msg.sender, amount + rewards);
+        emit onWithdraw(msg.sender, tokensToSend);
     }
 
     /// @notice Get the data for each user (to show in the frontend dapp)
-    function getData(address _user) external view returns (uint256 amount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) {
+    function getData(address _user) external view returns (uint256 userAmount, uint256 withdrawn, uint256 rewardsTokensPerSec, uint256 userTokensPerSec, uint256 lastRewardsWithdrawn, uint256 lastUserWithdrawn, uint256 pendingRewards, uint256 to) {
         return _getData(_user);
     }
 
@@ -160,26 +161,34 @@ contract LitlabPreStakingBox is Ownable {
     }
 
     /// @notice Calculate the token vesting according the investor type
-    function _calculateTokens(InvestorType _investorType, uint256 _amount) internal view returns (uint256) {
-        uint256 vestingDays = 0;
-        if (_investorType == InvestorType.ANGEL) vestingDays = 36 * 30 days;
-        else if (_investorType == InvestorType.SEED) vestingDays = 30 * 30 days;
-        else if (_investorType == InvestorType.STRATEGIC) vestingDays = 24 * 30 days;
+    function _calculateTokens(address _user) internal view returns (uint256) {
+        InvestorType investorType = balances[msg.sender].investorType;
+        uint256 vestingDays;
+        if (investorType == InvestorType.ANGEL) vestingDays = 36 * 30 days;
+        else if (investorType == InvestorType.SEED) vestingDays = 30 * 30 days;
+        else if (investorType == InvestorType.STRATEGIC) vestingDays = 24 * 30 days;
 
-        uint256 diffTime = block.timestamp - stakeStartDate;
-        if (diffTime > vestingDays) diffTime = vestingDays;
+        uint256 diffTime = block.timestamp - (balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn);
+        (, , , uint256 userTokensPerSec, , , , ) = _getData(_user);
+        uint256 tokens = diffTime * userTokensPerSec; 
+        if (balances[msg.sender].amount - balances[msg.sender].withdrawn < tokens) tokens = balances[msg.sender].amount - balances[msg.sender].withdrawn;
 
-        return diffTime * _amount / vestingDays; 
+        return tokens;
     }
 
     /// Return contract data needed in the frontend
-    function _getData(address _user) internal view returns (uint256 userAmount, uint256 withdrawn, uint256 userTokensPerSec,  uint256 lastRewardsWithdraw,  uint256 pendingRewards, uint256 to) {
+    function _getData(address _user) internal view returns (uint256 userAmount, uint256 withdrawn, uint256 rewardsTokensPerSec, uint256 userTokensPerSec, uint256 lastRewardsWithdraw, uint256 lastUserWithdrawn, uint256 pendingRewards, uint256 to) {
         userAmount = balances[_user].amount;
         withdrawn = balances[_user].withdrawn;
-        userTokensPerSec = (totalRewards / (stakeEndDate - stakeStartDate)) * balances[_user].amount / totalStakedAmount;
-        lastRewardsWithdraw = balances[_user].lastRewardsWithdraw;
-        uint256 from = balances[_user].lastRewardsWithdraw == 0 ? stakeStartDate : balances[_user].lastRewardsWithdraw;
+        lastRewardsWithdraw = balances[_user].lastRewardsWithdrawn;
+        lastUserWithdrawn = balances[_user].lastUserWithdrawn;
+
+        uint256 fromRewards = balances[_user].lastRewardsWithdrawn == 0 ? stakeStartDate : balances[_user].lastRewardsWithdrawn;
         to = block.timestamp > stakeEndDate ? stakeEndDate : block.timestamp;
-        pendingRewards = withdrawn == 0 ? (to - from) * userTokensPerSec : 0;
+
+        rewardsTokensPerSec = (totalRewards / (stakeEndDate - stakeStartDate)) * balances[_user].amount / totalStakedAmount;
+        userTokensPerSec = (userAmount - (userAmount*15/100)) / (stakeEndDate - stakeStartDate);
+
+        pendingRewards = balances[_user].withdrawnFirst == false ? (to - fromRewards) * rewardsTokensPerSec : 0;
     }
 }
