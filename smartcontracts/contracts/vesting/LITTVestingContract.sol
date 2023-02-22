@@ -157,11 +157,13 @@ contract LITTVestingContract is Ownable {
             uint256 amountToWithdraw = data._TGEPercentage * data._amount / 100;
             _sendTokens(wallet, _vestingType, amountToWithdraw);
         } else {
-            uint256 start = lastWithdraw[_vestingType] == 0 ? listing_date + (data._cliffMonths * 30 days) : lastWithdraw[_vestingType];
-            uint256 end = listing_date + (data._cliffMonths * 30 days) + (uint256(data._months) * 30 days);
+            uint256 start = listing_date + (data._cliffMonths * 30 days);
+            uint256 end = start + (uint256(data._months) * 30 days);
+            uint256 from = lastWithdraw[_vestingType] == 0 ? start : lastWithdraw[_vestingType];
             uint256 to = block.timestamp > end ? end : block.timestamp;
             uint256 tokensPerSecond = data._amount / (end - start);
-            uint256 amountToWithdraw = (to - start) * tokensPerSecond;
+            require(to > from, "Expired");
+            uint256 amountToWithdraw = (to - from) * tokensPerSecond;
             if (amountToWithdraw > data._amount - withdrawnBalances[_vestingType]) amountToWithdraw = data._amount - withdrawnBalances[_vestingType];
 
             _sendTokens(wallet, _vestingType, amountToWithdraw);

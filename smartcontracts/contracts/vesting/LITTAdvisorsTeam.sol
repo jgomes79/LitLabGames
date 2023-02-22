@@ -15,10 +15,12 @@ contract LITTAdvisorsTeam is Ownable {
 
     mapping(address => uint256) private advisors;
     mapping(address => uint256) private advisorsWithdrawn;
+    mapping(address => uint256) private advisorsLastWithdrawn;
 
     mapping(address => bool) private teamWallets;
     address public teamWallet;
     uint256 public teamWithdrawn;
+    uint256 public teamLastWithdraw;
 
     address[5] private approvalWallets;
     mapping(address => bool) private teamApprovals;
@@ -73,12 +75,16 @@ contract LITTAdvisorsTeam is Ownable {
 
         uint256 start = listing_date + 90 days;
         uint256 end = start + (24 * 30 days);
+        uint256 from = advisorsLastWithdrawn[msg.sender] == 0 ? start : advisorsLastWithdrawn[msg.sender];
         uint256 to = block.timestamp > end ? end : block.timestamp;
-        uint256 tokensPerSecond = ADVISORS_AMOUNT / (end - start);
-        uint256 amountToWithdraw = ((to - start) * tokensPerSecond) - advisorsWithdrawn[msg.sender];
+        uint256 tokensPerSecond = advisors[msg.sender] / (end - start);
+        require(to > from, "Expired");
+
+        uint256 amountToWithdraw = (to - from) * tokensPerSecond;
         if (amountToWithdraw > advisors[msg.sender] - advisorsWithdrawn[msg.sender]) amountToWithdraw = advisors[msg.sender] - advisorsWithdrawn[msg.sender];
-        
+
         advisorsWithdrawn[msg.sender] += amountToWithdraw;
+        advisorsLastWithdrawn[msg.sender] = block.timestamp;
         IERC20(token).safeTransfer(msg.sender, amountToWithdraw);
 
         emit onAdvisorWithdraw(msg.sender, amountToWithdraw);
@@ -107,12 +113,16 @@ contract LITTAdvisorsTeam is Ownable {
         
         uint256 start = listing_date + 180 days;
         uint256 end = start + (42 * 30 days);
+        uint256 from = teamLastWithdraw == 0 ? start : teamLastWithdraw;
         uint256 to = block.timestamp > end ? end : block.timestamp;
         uint256 tokensPerSecond = TEAM_AMOUNT / (end - start);
-        uint256 amountToWithdraw = ((to - start) * tokensPerSecond) - teamWithdrawn;
+        require(to > from, "Expired");
+
+        uint256 amountToWithdraw = (to - from) * tokensPerSecond;
         if (amountToWithdraw > TEAM_AMOUNT - teamWithdrawn) amountToWithdraw = TEAM_AMOUNT - teamWithdrawn;
         
         teamWithdrawn += amountToWithdraw;
+        teamLastWithdraw = block.timestamp;
         IERC20(token).safeTransfer(teamWallet, amountToWithdraw);
 
         emit onTeamWithdraw(msg.sender, amountToWithdraw);
@@ -126,7 +136,7 @@ contract LITTAdvisorsTeam is Ownable {
     }
 
     /// @notice Quick way to know how many tokens are pending in the contract
-    function getTokensInVesting() external view returns(uint256) {
+    function getTokensInContract() external view returns(uint256) {
         return IERC20(token).balanceOf(address(this));
     }
 
