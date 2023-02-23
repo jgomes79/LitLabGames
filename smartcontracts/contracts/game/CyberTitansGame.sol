@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 import "../token/ILitlabGamesToken.sol";
+import "../metatx/LitlabContext.sol";
 
 /// SmartContract for CyberTitans game modality. It's a centralized SmartContract.
 /// Working mode:
@@ -13,7 +14,7 @@ import "../token/ILitlabGamesToken.sol";
 ///     - checkWallets: To check that the smartcontract can get tokens from every player involved in the matchmaking
 ///     - createGame: Get tokens for each player in the matchmaking
 ///     - finalizeGame: When game has finished, there're only 3 winners. Split the tokens between the winners, get the platform fee and burn tokens
-contract CyberTitansGame is Ownable {
+contract CyberTitansGame is LitlabContext, Ownable {
     using SafeERC20 for IERC20;
 
     // To store game data
@@ -44,7 +45,7 @@ contract CyberTitansGame is Ownable {
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
     /// Constructor
-    constructor(address _manager, address _wallet, address _litlabToken, uint256 _maxBetAmount) {
+    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken, uint256 _maxBetAmount) LitlabContext(_forwarder) {
         manager = _manager;
         wallet = _wallet;
         litlabToken = _litlabToken;
@@ -101,7 +102,7 @@ contract CyberTitansGame is Ownable {
 
     /// Creates a new game and get the bet tokens from all the players
     function createGame(address[] memory _players, address _token, uint256 _amount) external {
-        require(msg.sender == manager, "OnlyManager");
+        require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_players.length != 0, "BadArray");
         require(_amount != 0, "BadAmount");
@@ -125,7 +126,7 @@ contract CyberTitansGame is Ownable {
 
     /// Finalize a game. Send the tokens to the winners, take a fee and burn tokens to make litlabgames token deflactionary
     function finalizeGame(uint256 _gameId, address[] calldata _winners) external {
-        require(msg.sender == manager, "OnlyManager");
+        require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_checkPlayers(_gameId, _winners) == true, "BadPlayers");
 
@@ -148,8 +149,8 @@ contract CyberTitansGame is Ownable {
 
     /// OnlyOwner function to withdraw the tokens if there's any problem in the smartcontract
     function emergencyWithdraw(address _token) external onlyOwner {
-        uint256 balance = ILitlabGamesToken(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(msg.sender, balance);
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).safeTransfer(owner, balance);
 
         emit onEmergencyWithdraw(balance, _token);
     }

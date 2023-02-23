@@ -1,3 +1,4 @@
+const LitlabForwarder = artifacts.require("./LitlabForwarder.sol");
 const LitlabGamesToken = artifacts.require("./LitlabGamesToken.sol");
 const LitlabPreStakingBox = artifacts.require("./LitlabPreStakingBox.sol");
 const LITTVestingContract = artifacts.require("./LITTVestingContract.sol");
@@ -51,11 +52,15 @@ async function doDeploy(deployer, network, accounts) {
     await token.transfer(advisorsTeam.address, advisorsAndTeamAmount);
     console.log(`Sended ${web3.utils.fromWei(advisorsAndTeamAmount,'ether')} to the AdvisorsTeam contract`);
 
-    await deployer.deploy(CyberTitansGame, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'));
+    await deployer.deploy(LitlabForwarder);
+    let forwarder = await LitlabForwarder.deployed();
+    console.log('LitlabForwarder deployed:', forwarder.address);
+
+    await deployer.deploy(CyberTitansGame, forwarder.address, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'));
     let cyberTitansGame = await CyberTitansGame.deployed();
     console.log('CyberTitansGame deployed:', cyberTitansGame.address);
 
-    await deployer.deploy(CyberTitansTournament, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'), 50);
+    await deployer.deploy(CyberTitansTournament, forwarder.address, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'), 50);
     let cyberTitansTournament = await CyberTitansTournament.deployed();
     console.log('CyberTitansTournament deployed:', cyberTitansTournament.address);
 }
