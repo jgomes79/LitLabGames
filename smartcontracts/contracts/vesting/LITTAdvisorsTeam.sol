@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
-import "truffle/console.sol";
-
 /// @title Vesting contract for advisors and team tokens
 contract LITTAdvisorsTeam is Ownable {
     using SafeERC20 for IERC20;
