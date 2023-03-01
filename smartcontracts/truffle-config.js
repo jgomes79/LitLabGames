@@ -41,8 +41,8 @@
  * https://trufflesuite.com/docs/truffle/getting-started/using-the-truffle-dashboard/
  */
 
-// require('dotenv').config();
-// const { MNEMONIC, PROJECT_ID } = process.env;
+require('dotenv').config();
+const { MNEMONIC, RPC_URL } = process.env;
 
 const HDWalletProvider = require('@truffle/hdwallet-provider');
 
@@ -69,8 +69,15 @@ module.exports = {
       disableConfirmationListener: true
     },
     bsctestnet: {
-      provider: () => new HDWalletProvider("", "https://data-seed-prebsc-1-s1.binance.org:8545"),
+      provider: () => new HDWalletProvider(MNEMONIC, RPC_URL),
       network_id: 97,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    },
+    goerli: {
+      provider: () => new HDWalletProvider(MNEMONIC, RPC_URL),
+      network_id: 5,
       confirmations: 2,
       timeoutBlocks: 200,
       skipDryRun: true
@@ -102,7 +109,8 @@ module.exports = {
   ],
 
   api_keys: {
-    bscscan: 'AQZSGEIRSYAVDNR1CGURXVFBN4QKRS328V'
+    bscscan: 'AQZSGEIRSYAVDNR1CGURXVFBN4QKRS328V',
+    etherscan: 'F8D8H561ZUE6UI2SA4Q8A3FVWU1JIBZJUP'
   },
 
   solidityLog: {

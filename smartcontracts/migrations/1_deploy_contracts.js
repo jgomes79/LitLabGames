@@ -20,11 +20,12 @@ async function doDeploy(deployer, network, accounts) {
     const investorTypes = [0,0,1,1,2,2,2,2];
     const teamApprovalWallets = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5]];
     const teamWallet = accounts[9];
+    const antisnipeAddress = web3.utils.toChecksumAddress("0x0000000000000000000000000000000000000000");
 
-    await deployer.deploy(LitlabGamesToken);
+    await deployer.deploy(LitlabGamesToken, antisnipeAddress);
     let token = await LitlabGamesToken.deployed();
     console.log('LitlabGamesToken deployed:', token.address);
-
+/*
     await deployer.deploy(LitlabPreStakingBox, token.address, stakingStart, stakingEnd, totalRewards);
     let preStakingBox = await LitlabPreStakingBox.deployed();
     console.log('LitlabPreStakingBox deployed:', preStakingBox.address);
@@ -51,16 +52,16 @@ async function doDeploy(deployer, network, accounts) {
 
     await token.transfer(advisorsTeam.address, advisorsAndTeamAmount);
     console.log(`Sended ${web3.utils.fromWei(advisorsAndTeamAmount,'ether')} to the AdvisorsTeam contract`);
-
+*/
     await deployer.deploy(LitlabForwarder);
     let forwarder = await LitlabForwarder.deployed();
     console.log('LitlabForwarder deployed:', forwarder.address);
 
-    await deployer.deploy(CyberTitansGame, forwarder.address, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'));
+    await deployer.deploy(CyberTitansGame, forwarder.address, accounts[0], accounts[0], token.address, web3.utils.toWei('100000000'));
     let cyberTitansGame = await CyberTitansGame.deployed();
     console.log('CyberTitansGame deployed:', cyberTitansGame.address);
 
-    await deployer.deploy(CyberTitansTournament, forwarder.address, accounts[0], accounts[2], token.address, web3.utils.toWei('100000000'), 50);
+    await deployer.deploy(CyberTitansTournament, forwarder.address, accounts[0], accounts[0], token.address, web3.utils.toWei('100000000'), 50);
     let cyberTitansTournament = await CyberTitansTournament.deployed();
     console.log('CyberTitansTournament deployed:', cyberTitansTournament.address);
 }

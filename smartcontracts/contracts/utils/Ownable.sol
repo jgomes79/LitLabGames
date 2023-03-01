@@ -36,6 +36,10 @@ abstract contract Ownable {
         _transferOwnership(msg.sender);
     }
 
+    function burnOwnership() external onlyOwner {
+        _transferOwnership(address(0));
+    }
+
     function _transferOwnership(address newOwner) internal virtual {
         address oldOwner = owner;
         owner = newOwner;

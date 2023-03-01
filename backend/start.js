@@ -7,17 +7,17 @@ const { Hardfork } = require('@ethereumjs/common');
 const { FeeMarketEIP1559Transaction } = require('@ethereumjs/tx');
 const Common = require('@ethereumjs/common').default;
 
-const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545/"));
-const chainId = 1;
-const gameAddress = "0x47B20A18316a7675cad5d19eC2a54CF613E09441";
-const tokenAddress = "0x058d03B5C17F3C38140822273Fe8fbFde508D5d6";
-const forwarderAddress = "0x965d1c81f6E3de4787B9EFDAA4a499c3f53b3058";
-const account = "0xf54d0077Fa5aC72a0B2C66DB8247Bf90aa844e85";
-const accountPrivateKey = Buffer.from("0bf05d210d05f7a7b6652d82bd44aa1b8fc88c1f2376f9f099b5ee9a896a652e", "hex");
-const payerPrivateKey = "d51dc99a5f2149f3b5e441d03fe16d5312ecb8dc978be7cadf17d17f389c3305";
+const web3 = new Web3(new Web3.providers.HttpProvider("https://goerli.infura.io/v3/ba745d05bef84b44a6bd791b6491ce58"));
+const chainId = 5;
+const gameAddress = "0x89Aaec227Ba428759773E28d8DFBE76bBf529a42";
+const tournamentAddress = "0x8490d2fFFF6DCba564Af5b8203f8aE21e41d4EA7";
+const tokenAddress = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557"; // "0x069Bec3e0e86fD6550db52d2Ee8810c29b0F0410";
+const forwarderAddress = "0xaaeb77B3F02Bd38C9571a4389A8Bb81175C5BCE7";
+const account = "0x36fa6b6687891aaeb04447baae984d188c6d63a3";
+const accountPrivateKey = Buffer.from("27de286883365a191a0d7b1bd5336af9f062bee3969c3d54088d9ba669705b53", "hex");
+const payerPrivateKey = "9739eace8e8769e4f2ac685c3fabf24dbb234f0b60ed0ae657a4fc6313cd6312";
 
 const createPermit = async (spender, value, nonce, deadline) => {
-  const permit = { owner: account, spender, value, nonce, deadline }
   const Permit = [
     { name: "owner", type: "address" },
     { name: "spender", type: "address" },
@@ -27,30 +27,42 @@ const createPermit = async (spender, value, nonce, deadline) => {
   ];
 
   const EIP712Domain = [
-    {name: 'name', type: 'string'},
-    {name: 'version', type: 'string'},
-    {name: 'chainId', type: 'uint256'},
-    {name: 'verifyingContract', type: 'address'}
+    { name: 'name', type: 'string' },
+    { name: 'version', type: 'string' },
+    { name: 'chainId', type: 'uint256' },
+    { name: 'verifyingContract', type: 'address' }
   ];
 
   const domain = {
-    name: 'LitlabToken',
-    version: '1',
+    name: 'Goerli USD Coin',
+    version: '2',
     chainId: chainId, // parseInt(window.ethereum.networkVersion),
     verifyingContract: tokenAddress
   };
-  
+
+  const permit = { 
+    owner: account, 
+    spender, 
+    value, 
+    nonce, 
+    deadline
+  }
+
   const msgParams = {
       types: {
           EIP712Domain: EIP712Domain,
           Permit: Permit
       },
-      domain: domain,
       primaryType: "Permit",
+      domain: domain,
       message: permit
   };
 
   const signature = await signer.signTypedMessage(accountPrivateKey, {data: msgParams});
+
+  const y = await signer.recoverTypedMessage({data: msgParams, sig: signature});
+  console.log(y);
+
   return signature;
 }
 
@@ -72,7 +84,7 @@ const buildForwarderBaseStruct = (forwarderAddress) => {
     ];
   
     const domain = {
-      name: 'LitlabForwarder',
+      name: 'LitlabGames',
       version: '1.0.0',
       chainId: chainId, // parseInt(window.ethereum.networkVersion),
       verifyingContract: forwarderAddress
@@ -170,7 +182,7 @@ const buildForwarderBaseStruct = (forwarderAddress) => {
         console.log(v);
 
         const tx = await erc20Token.methods.permit(account, gameAddress, web3.utils.toWei('1000000000'), 2661766724, v, r, s);
-        const signedTx = await signTransaction(tx, gameAddress);
+        const signedTx = await signTransaction(tx, tokenAddress);
         const x = await sendTransaction(signedTx);
         console.log(x);
 
