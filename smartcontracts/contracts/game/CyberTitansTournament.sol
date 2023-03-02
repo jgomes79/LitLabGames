@@ -19,16 +19,17 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     using SafeERC20 for IERC20;
 
     struct TournamentStruct {
-        uint256 bet;
+        uint256 playerBet;
+        uint256 tournamentAssuredAmount;
         address token;
-        uint24 numOfPlayers;
+        uint24 numOfTokenPlayers;
+        uint24 numOfCTTPlayers;
         uint64 startDate;
         uint64 endDate;
     }
     mapping(uint256 => TournamentStruct) private tournaments;
     uint256 tournamentCounter;
 
-    uint256 public maxBetAmount;                    // Security. Don't let create a game with a bet greater than this variable
     uint16 public penalty;                          // If the user joint to a tournament and wants to retire before starting, there's a penalty he has to pay.
 
     address public wallet;
@@ -50,11 +51,10 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     event onRetiredTournament(uint256 _id, address _player);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
-    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken, uint256 _maxBetAmount, uint8 _penalty) LitlabContext(_forwarder) {
+    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken, uint8 _penalty) LitlabContext(_forwarder) {
         manager = _manager;
         wallet = _wallet;
         litlabToken = _litlabToken;
-        maxBetAmount = _maxBetAmount;
         penalty = _penalty;
 
         _buildArrays();
@@ -116,17 +116,18 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         pause = !pause;
     }
 
-    function createTournament(address _token, uint64 _startDate, uint256 _amount) external {
+    function createTournament(address _token, uint64 _startDate, uint256 _playerBet, uint256 _tournamentAssuredAmount) external {
         require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
-        require(_amount != 0, "BadAmount");
-        require(_amount <= maxBetAmount, "MaxAmount");
+        require(_playerBet != 0, "BadAmount");
+        require(_tournamentAssuredAmount != 0, "BadAmount");
         require(_token != address(0), "BadToken");
 
         uint tournamentId = ++tournamentCounter;
         TournamentStruct storage tournament = tournaments[tournamentId];
         tournament.token = _token;
-        tournament.bet = _amount;
+        tournament.playerBet = _playerBet;
+        tournament.tournamentAssuredAmount = _tournamentAssuredAmount;
         tournament.startDate = _startDate;
 
         emit onTournamentCreated(tournamentId);
@@ -140,8 +141,7 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         if (tournament.startDate > 0) require(block.timestamp >= tournament.startDate, "NotStarted");
         if (tournament.endDate > 0) require(block.timestamp <= tournament.endDate, "Ended");
 
-        tournament.numOfPlayers++;
-        IERC20(tournament.token).safeTransferFrom(wallet, address(this), tournament.bet);
+        tournament.numOfCTTPlayers++;
         
         emit onJoinedTournament(_id, _user);
     }
@@ -153,8 +153,8 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         if (tournament.startDate > 0) require(block.timestamp >= tournament.startDate, "NotStarted");
         if (tournament.endDate > 0) require(block.timestamp <= tournament.endDate, "Ended");
         
-        tournament.numOfPlayers++;
-        IERC20(tournament.token).safeTransferFrom(_msgSender(), address(this), tournament.bet);
+        tournament.numOfTokenPlayers++;
+        IERC20(tournament.token).safeTransferFrom(_msgSender(), address(this), tournament.playerBet);
 
         emit onJoinedTournament(_id, _msgSender());
     }
@@ -167,10 +167,8 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         require(msg.sender == manager, "OnlyManager");
         require(pause == false, "Paused");
         
-        // TODO. Pending of decision
         TournamentStruct memory tournament = tournaments[_id];
-        IERC20(tournament.token).safeTransfer(_wallet, (tournament.bet - (tournament.bet * penalty / 1000)));
-        IERC20(tournament.token).safeTransfer(wallet, (tournament.bet * penalty / 1000));
+        tournament.numOfCTTPlayers--;
 
         emit onRetiredTournament(_id, _wallet);
     }
@@ -180,8 +178,9 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         
         // TODO. Pending of decision
         TournamentStruct memory tournament = tournaments[_id];
-        IERC20(tournament.token).safeTransfer(_msgSender(), (tournament.bet - (tournament.bet * penalty / 1000)));
-        IERC20(tournament.token).safeTransfer(wallet, (tournament.bet * penalty / 1000));
+        tournament.numOfTokenPlayers--;
+        IERC20(tournament.token).safeTransfer(_msgSender(), (tournament.playerBet - (tournament.playerBet * penalty / 1000)));
+        IERC20(tournament.token).safeTransfer(wallet, (tournament.playerBet * penalty / 1000));
 
         emit onRetiredTournament(_id, _msgSender());
     }
@@ -191,27 +190,43 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         require(pause == false, "Paused");
 
         TournamentStruct memory tournament = tournaments[_tournamentId];
-        uint256 index = _getPrizesColumn(tournament.numOfPlayers);
+        // Get the num of players in the tournament
+        uint24 numOfPlayers = tournament.numOfTokenPlayers + tournament.numOfCTTPlayers;
+        // Get the prizes array
+        uint256 index = _getPrizesColumn(numOfPlayers);
         require(winners[index] == _winners.length, "BadWinners");
 
-        uint256 totalBet = tournament.bet * tournament.numOfPlayers;
-        uint256 _rake = totalBet * rake / 1000;
-        uint256 _fee = totalBet * fee / 1000;
+        // Calculate if we got the minimum assurance token amount for the tournament. Otherwise, the game will add the tokens
+        uint256 amountPlayed = tournament.playerBet * tournament.numOfTokenPlayers;
+        if (amountPlayed < tournament.tournamentAssuredAmount) {
+            IERC20(tournament.token).safeTransferFrom(wallet, address(this), tournament.tournamentAssuredAmount - amountPlayed);
+            amountPlayed = tournament.tournamentAssuredAmount;
+        }
 
-        uint256 pot = totalBet - (_rake + _fee);
+        // Burn those tokens
+        uint256 _rake = amountPlayed * rake / 1000;
+        // Fee
+        uint256 _fee = amountPlayed * fee / 1000;
+        // Tournament pot
+        uint256 pot = amountPlayed - (_rake + _fee);
 
+        // For each player in the winners array
         uint8 i;
         do {
+            // Get the player's prize
             uint256 prizePercentage = _getPrize(index, i+1);
             uint256 prize = (pot * prizePercentage) / (10 ** 7);
             if (prize != 0) IERC20(tournament.token).safeTransfer(_winners[i], prize);
             ++i;
         } while(i<_winners.length);
 
+        // Burn the rake and get the fee
         if (tournament.token == litlabToken) {
+            // If we are using litlabtoken, burn the rake
             ILitlabGamesToken(tournament.token).burn(_rake);
             IERC20(tournament.token).safeTransfer(wallet, _fee);
         } else {
+            // If we are using other token, transfer the rake instead of burning
             IERC20(tournament.token).safeTransfer(wallet, (_rake + _fee));
         }
 

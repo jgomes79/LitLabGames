@@ -124,7 +124,7 @@ contract CyberTitansGame is LitlabContext, Ownable {
         emit onGameCreated(gameId);
     }
 
-    /// Finalize a game. Send the tokens to the winners, take a fee and burn tokens to make litlabgames token deflactionary
+    /// Finalize a game. Send the tokens to the winners, take a fee and burn tokens
     function finalizeGame(uint256 _gameId, address[] calldata _winners) external {
         require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
