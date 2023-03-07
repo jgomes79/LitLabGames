@@ -143,7 +143,6 @@ contract("LitlabPreStakingBox tests", async(accounts) => {
         await withdrawRewards(accounts[6], oneMonthLater);
         await withdrawRewards(accounts[7], oneMonthLater);
         await withdrawRewards(accounts[8], oneMonthLater);
-        // TODO. Asserts and console.logs
 
         await printUsersBalance(accounts);
     });

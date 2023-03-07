@@ -13,33 +13,31 @@ import "../metatx/LitlabContext.sol";
 /// - Then, when users want to connect to the game, when matchmaking is done (8 playes), in the server, we call the functions:
 ///     - createTournament: To create a new tournament. Returns a tournament id
 ///     - joinTournament: To join a new user to a tournament
-///     - retireTournament: To retire a user from a tournament
+///     - retireTournament: To retire a user from a tournament (deactivated for now. nobody could retire once joined)
 ///     - finalizeTournament: When tournament has finished, send the winner wallets and distribute the prizes according the prizes matrix
 contract CyberTitansTournament is LitlabContext, Ownable {
     using SafeERC20 for IERC20;
 
     struct TournamentStruct {
-        uint256 playerBet;
-        uint256 tournamentAssuredAmount;
-        address token;
-        uint24 numOfTokenPlayers;
-        uint24 numOfCTTPlayers;
-        uint64 startDate;
-        uint64 endDate;
+        uint256 playerBet;                  // Tournament bet for each player
+        uint256 tournamentAssuredAmount;    // Tournament minimum prize
+        address token;                      // Tournament token
+        uint24 numOfTokenPlayers;           // Num of players betting with LITTs
+        uint24 numOfCTTPlayers;             // Num of players playing with CTT (softcoin of the game not used in blockchain)
+        uint64 startDate;                   // Tournament start date
+        uint64 endDate;                     // Tournament end date
     }
-    mapping(uint256 => TournamentStruct) private tournaments;
-    uint256 tournamentCounter;
+    mapping(uint256 => TournamentStruct) private tournaments;   // Mapping with Tournaments
+    uint256 tournamentCounter;                                  // To calculate next tournamentId
 
-    uint16 public penalty;                          // If the user joint to a tournament and wants to retire before starting, there's a penalty he has to pay.
+    address public wallet;                                      // Wallet with LITTs to take when player bets don't make the minimun tournament amount
+    address public manager;                                     // Account authorized to call the contract from a backend
+    address public litlabToken;                                 // LitlabGames token
 
-    address public wallet;
-    address public manager;
-    address public litlabToken;
-
-    uint32[][8] public prizes;
-    uint32[][8] public players;
-    uint32[][12] public tops;
-    uint8[8] public winners = [3, 4, 6, 8, 16, 32, 64, 128];
+    uint32[][8] public prizes;                                  // Matrix of prizes
+    uint32[][8] public players;                                 // Matrix of players
+    uint32[][12] public tops;                                   // Matrix of tops
+    uint8[8] public winners = [3, 4, 6, 8, 16, 32, 64, 128];    // Array of winners according to tournament players number
 
     uint16 public rake = 25;
     uint16 public fee = 25;
@@ -48,15 +46,15 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     event onTournamentCreated(uint256 _tournamentId);
     event onTournamentFinalized(uint256 _tournamentId);
     event onJoinedTournament(uint256 _id, address _player);
-    event onRetiredTournament(uint256 _id, address _player);
+    //event onRetiredTournament(uint256 _id, address _player);
     event onTournamentStarted(uint256 _id, uint24 _litPlayers, uint24 _cttPlayers);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
-    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken, uint8 _penalty) LitlabContext(_forwarder) {
+    // Initializate the data and build the matrix according to the tokenomics
+    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken) LitlabContext(_forwarder) {
         manager = _manager;
         wallet = _wallet;
         litlabToken = _litlabToken;
-        penalty = _penalty;
 
         _buildArrays();
     }
@@ -68,7 +66,7 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         prizes[3] = [2975000, 1875000, 1475000, 1125000, 850000, 700000, 550000, 450000];
         prizes[4] = [2575000, 1705000, 1100000, 850000, 625000, 500000, 400000, 317000, 241000];
         prizes[5] = [2000000, 1400000, 945000, 770000, 600000, 500000, 400000, 312500, 164063, 110000];
-        prizes[6] = [1825000, 1325000, 842000, 700000, 562500, 460000, 360000, 265000, 130000, 73000, 45390];
+        prizes[6] = [1825000, 1325000, 842000, 700000, 562500, 460000, 360000, 265000, 130000, 73001, 45390];
         prizes[7] = [1780000, 1275000, 785000, 609200, 507500, 412000, 320000, 232500, 105000, 51000, 31712, 22000];
 
         players[0] = [1,8];
@@ -100,10 +98,9 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         litlabToken = _litlabToken;
     }
 
-    function updateFees(uint16 _fee, uint16 _rake, uint16 _penalty) external onlyOwner {
+    function updateFees(uint16 _fee, uint16 _rake) external onlyOwner {
         fee = _fee;
         rake = _rake;
-        penalty = _penalty;
     }
 
     function changeArrays(uint32[][8] calldata _prizes, uint32[][8] calldata _players, uint32[][12] calldata _tops, uint8[8] calldata _winners) external onlyOwner {
@@ -117,7 +114,9 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         pause = !pause;
     }
 
-    function createTournament(address _token, uint64 _startDate, uint64 _endDate, uint256 _playerBet, uint256 _tournamentAssuredAmount) external {
+    // To create the tournament only need. Token address, start date, bet for each player and minimum tournament prize
+    // Returns the tournamentId
+    function createTournament(address _token, uint64 _startDate, uint256 _playerBet, uint256 _tournamentAssuredAmount) external {
         require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_playerBet != 0, "BadAmount");
@@ -130,11 +129,11 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         tournament.playerBet = _playerBet;
         tournament.tournamentAssuredAmount = _tournamentAssuredAmount;
         if (_startDate > 0) tournament.startDate = _startDate;
-        if (_endDate > 0) tournament.endDate = _endDate;
 
         emit onTournamentCreated(tournamentId);
     }
 
+    // A player joins the tournament only using the id
     function joinTournament(uint256 _id) external {
         require(pause == false, "Paused");
 
@@ -148,38 +147,39 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         emit onJoinedTournament(_id, _msgSender());
     }
 
+    // Get tournament data
     function getTournament(uint256 _id) external view returns(TournamentStruct memory) {
         return tournaments[_id];
     }
 
+    // Player retires from tournament before started
     function retireFromTournament(uint256 _id) external {
-        require(pause == false, "Paused");
-        
-        // TODO. Pending of decision
-        TournamentStruct memory tournament = tournaments[_id];
-        tournament.numOfTokenPlayers--;
-        IERC20(tournament.token).safeTransfer(_msgSender(), (tournament.playerBet - (tournament.playerBet * penalty / 1000)));
-        IERC20(tournament.token).safeTransfer(wallet, (tournament.playerBet * penalty / 1000));
-
-        emit onRetiredTournament(_id, _msgSender());
+        // In the first version, users are not allowed to retire once they joined.
+        // This is becuase litlabgames is paying the gas fees and we don't want users joining and retiring.
     }
 
+    // Server indicates that the tournament is going to start (this is not the exact moment when starting)
+    // Reports the number of players with LITTs and CTT tickets.
+    // We need this data to calculate the prizes properly in the finalizeTournament function
     function startTournament(uint256 _id, uint24 _litPlayers, uint24 _cttPlayers) external {
         require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
         
         TournamentStruct storage tournament = tournaments[_id];
-        require(_cttPlayers == tournament.numOfTokenPlayers, "BadLITTPlayers");
-        tournament.numOfCTTPlayers = _cttPlayers;
+        require(_cttPlayers == tournament.numOfTokenPlayers, "BadLITTPlayers"); // Check the server reports the same LITT users that we count in the smartcontract
+        tournament.numOfCTTPlayers = _cttPlayers;   // Report the CTT tickets free2play players
 
         emit onTournamentStarted(_id, _litPlayers, _cttPlayers);
     }
 
+    // Server calls this function and the smartcontract give the prizes according the matrix data
+    // Server only reports an array with winners. We calculate the prizes
     function finalizeTournament(uint256 _tournamentId, address[] calldata _winners) external {
         require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
 
-        TournamentStruct memory tournament = tournaments[_tournamentId];
+        TournamentStruct storage tournament = tournaments[_tournamentId];
+        tournament.endDate = uint64(block.timestamp);
         // Get the num of players in the tournament
         uint24 numOfPlayers = tournament.numOfTokenPlayers + tournament.numOfCTTPlayers;
         // Get the prizes array
@@ -245,6 +245,7 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         return prizes[_index][index];
     }
 
+    // If something happens, owner can withdraw the LITT funds of this contract
     function emergencyWithdraw(address _token) external onlyOwner {
         uint256 balance = IERC20(_token).balanceOf(address(this));
         IERC20(_token).safeTransfer(owner, balance);

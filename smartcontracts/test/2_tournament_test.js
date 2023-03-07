@@ -35,7 +35,13 @@ contract("CyberTitansTournament tests", async(accounts) => {
         assert.equal(balance, web3.utils.toWei('9000'));
     });
 
-    it("2. Finalize a tournament", async () => {
+    it("2. Tournament starts", async () => {
+        const cyberTitansTournament = await CyberTitansTournament.deployed();
+
+        await cyberTitansTournament.startTournament(tournamentId, 9, 4, {from: manager});
+    });
+
+    it("3. Finalize a tournament", async () => {
         const token = await LitlabGamesToken.deployed();
         const cyberTitansTournament = await CyberTitansTournament.deployed();
 
