@@ -17,7 +17,7 @@ interface IAntisnipe {
 /// @notice ERC20 token with:
 ///    - EIP721 permit gasless
 ///    - Burnable
-///    - Antisnipping tools
+///    - Antisnipping tools (gobit)
 contract LitlabGamesToken is ERC20Permit, Ownable {
     IAntisnipe public antisnipe;
     bool public antisnipeDisable;

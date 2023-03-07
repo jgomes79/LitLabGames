@@ -71,9 +71,9 @@ module.exports = {
     bsctestnet: {
       provider: () => new HDWalletProvider(MNEMONIC, RPC_URL),
       network_id: 97,
-      confirmations: 2,
-      timeoutBlocks: 200,
-      skipDryRun: true
+      timeoutBlocks: 600,
+      skipDryRun: true,
+      gasPrice: 20000000000
     },
     goerli: {
       provider: () => new HDWalletProvider(MNEMONIC, RPC_URL),

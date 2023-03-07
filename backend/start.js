@@ -8,11 +8,11 @@ const { FeeMarketEIP1559Transaction } = require('@ethereumjs/tx');
 const Common = require('@ethereumjs/common').default;
 
 const web3 = new Web3(new Web3.providers.HttpProvider("https://goerli.infura.io/v3/ba745d05bef84b44a6bd791b6491ce58"));
-const chainId = 5;
-const gameAddress = "0x89Aaec227Ba428759773E28d8DFBE76bBf529a42";
-const tournamentAddress = "0x8490d2fFFF6DCba564Af5b8203f8aE21e41d4EA7";
-const tokenAddress = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557"; // "0x069Bec3e0e86fD6550db52d2Ee8810c29b0F0410";
-const forwarderAddress = "0xaaeb77B3F02Bd38C9571a4389A8Bb81175C5BCE7";
+const chainId = 97;
+const gameAddress = "0x485614eAcc6bC6bC3cfB930aB84CB6BB36FbD0BE";
+const tournamentAddress = "0xA12E9d21De900E492eE61B7041430c60F1DF2662";
+const tokenAddress = "0xc269647ffCe5655DD6bf5Dd38A819992A5db92d3"; // "0x069Bec3e0e86fD6550db52d2Ee8810c29b0F0410";
+const forwarderAddress = "0x01624201B99262b6834f2cac0fEE75885e3720F2";
 const account = "0x36fa6b6687891aaeb04447baae984d188c6d63a3";
 const accountPrivateKey = Buffer.from("27de286883365a191a0d7b1bd5336af9f062bee3969c3d54088d9ba669705b53", "hex");
 const payerPrivateKey = "9739eace8e8769e4f2ac685c3fabf24dbb234f0b60ed0ae657a4fc6313cd6312";

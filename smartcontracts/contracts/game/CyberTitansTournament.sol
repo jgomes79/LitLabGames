@@ -49,6 +49,7 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     event onTournamentFinalized(uint256 _tournamentId);
     event onJoinedTournament(uint256 _id, address _player);
     event onRetiredTournament(uint256 _id, address _player);
+    event onTournamentStarted(uint256 _id, uint24 _litPlayers, uint24 _cttPlayers);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
     constructor(address _forwarder, address _manager, address _wallet, address _litlabToken, uint8 _penalty) LitlabContext(_forwarder) {
@@ -116,7 +117,7 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         pause = !pause;
     }
 
-    function createTournament(address _token, uint64 _startDate, uint256 _playerBet, uint256 _tournamentAssuredAmount) external {
+    function createTournament(address _token, uint64 _startDate, uint64 _endDate, uint256 _playerBet, uint256 _tournamentAssuredAmount) external {
         require(_msgSender() == manager, "OnlyManager");
         require(pause == false, "Paused");
         require(_playerBet != 0, "BadAmount");
@@ -128,22 +129,10 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         tournament.token = _token;
         tournament.playerBet = _playerBet;
         tournament.tournamentAssuredAmount = _tournamentAssuredAmount;
-        tournament.startDate = _startDate;
+        if (_startDate > 0) tournament.startDate = _startDate;
+        if (_endDate > 0) tournament.endDate = _endDate;
 
         emit onTournamentCreated(tournamentId);
-    }
-
-    function joinTournamentWithCTT(uint256 _id, address _user) external {
-        require(_msgSender() == manager, "OnlyManager");
-        require(pause == false, "Paused");
-
-        TournamentStruct storage tournament = tournaments[_id];
-        if (tournament.startDate > 0) require(block.timestamp >= tournament.startDate, "NotStarted");
-        if (tournament.endDate > 0) require(block.timestamp <= tournament.endDate, "Ended");
-
-        tournament.numOfCTTPlayers++;
-        
-        emit onJoinedTournament(_id, _user);
     }
 
     function joinTournament(uint256 _id) external {
@@ -163,16 +152,6 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         return tournaments[_id];
     }
 
-    function retireFromTournamentWitCTT(uint256 _id, address _wallet) external {
-        require(msg.sender == manager, "OnlyManager");
-        require(pause == false, "Paused");
-        
-        TournamentStruct memory tournament = tournaments[_id];
-        tournament.numOfCTTPlayers--;
-
-        emit onRetiredTournament(_id, _wallet);
-    }
-
     function retireFromTournament(uint256 _id) external {
         require(pause == false, "Paused");
         
@@ -183,6 +162,17 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         IERC20(tournament.token).safeTransfer(wallet, (tournament.playerBet * penalty / 1000));
 
         emit onRetiredTournament(_id, _msgSender());
+    }
+
+    function startTournament(uint256 _id, uint24 _litPlayers, uint24 _cttPlayers) external {
+        require(_msgSender() == manager, "OnlyManager");
+        require(pause == false, "Paused");
+        
+        TournamentStruct storage tournament = tournaments[_id];
+        require(_cttPlayers == tournament.numOfTokenPlayers, "BadLITTPlayers");
+        tournament.numOfCTTPlayers = _cttPlayers;
+
+        emit onTournamentStarted(_id, _litPlayers, _cttPlayers);
     }
 
     function finalizeTournament(uint256 _tournamentId, address[] calldata _winners) external {
