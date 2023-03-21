@@ -93,8 +93,8 @@ contract CyberTitansGame is LitlabContext, Ownable {
             uint256 allowance = IERC20(_token).allowance(_players[i], address(this));
 
             if (allowance >= _amount && balance >= _amount) info[i] = 0;
-            else if (allowance < _amount) info[i] = 1;
             else if (balance < _amount) info[i] = 2;
+            else if (allowance < _amount) info[i] = 1;
         }
 
         return info;
