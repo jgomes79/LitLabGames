@@ -40,6 +40,15 @@ contract CyberTitansGame is LitlabContext, Ownable {
     uint16 public waitMinutes = 15;                 // Minimum delay between create and finalize game
     bool private pause;                             // To pause the smartcontract
 
+    // HACKEN M01
+    event onManagerChanged(address _manager);
+    event onWalletChanged(address _wallet);
+    event onLitlabTokenChanged(address _litlabToken);
+    event onChangeWinners(uint16[] _winners);
+    event onUpdateFees(uint16 _fee, uint16 _rake);
+    event onUpdateWaitMinutes(uint16 _waitMinutes);
+    event onUpdateMaxBetAmount(uint256 _maxBetAmount);
+    event onChangedPause(bool _pause);
     event onGameCreated(uint256 _gameId);
     event onGameFinalized(uint256 _gameId, address[] _winners);
     event onEmergencyWithdraw(uint256 _balance, address _token);
@@ -53,10 +62,20 @@ contract CyberTitansGame is LitlabContext, Ownable {
     }
 
     // Functions to change smartcontract variables
-    function changeWallets(address _manager, address _wallet, address _litlabToken) external onlyOwner {
+    // HACKEN H06
+    function changeManager(address _manager) external onlyOwner {
         manager = _manager;
+        emit onManagerChanged(_manager);
+    }
+
+    function changeWallet(address _wallet) external onlyOwner {
         wallet = _wallet;
+        emit onWalletChanged(_wallet);
+    }
+
+    function changeLitlabToken(address _litlabToken) external onlyOwner {
         litlabToken = _litlabToken;
+        emit onLitlabTokenChanged(_litlabToken);
     }
 
     function changeWinners(uint16[] memory _winners) external onlyOwner {
@@ -64,23 +83,30 @@ contract CyberTitansGame is LitlabContext, Ownable {
 
         winners = new uint16[](_winners.length);
         for (uint256 i=0; i< _winners.length; i++) winners[i] = _winners[i];
+
+        emit onChangeWinners(_winners);
     }
 
     function updateFees(uint16 _fee, uint16 _rake) external onlyOwner {
         fee = _fee;
         rake = _rake;
+
+        emit onUpdateFees(_fee, _rake);
     }
 
     function updateWaitMinutes(uint16 _waitMinutes) external onlyOwner {
         waitMinutes = _waitMinutes;
+        emit onUpdateWaitMinutes(_waitMinutes);
     }
 
     function updateMaxBetAmount(uint256 _maxBetAmount) external onlyOwner {
         maxBetAmount = _maxBetAmount;
+        emit onUpdateMaxBetAmount(_maxBetAmount);
     }
 
     function changePause() external onlyOwner {
         pause = !pause;
+        emit onChangedPause(pause);
     }
     // End update functions
 
@@ -134,14 +160,18 @@ contract CyberTitansGame is LitlabContext, Ownable {
         require(block.timestamp >= game.startDate + (waitMinutes * 1 minutes), "WaitXMinutes"); // Protection to avoid a hacker that got the private key from the server to withdraw
         require(game.endDate == 0, "AlreadyEnd");
         game.endDate = uint64(block.timestamp);
+        
+        // HACKEN M06
+        uint256 totalBet = game.totalBet;
+        address token = game.token;
 
-        for (uint256 i=0; i<_winners.length; i++) IERC20(game.token).safeTransfer(_winners[i], game.totalBet * winners[i] / 1000);
+        for (uint256 i=0; i<_winners.length; i++) IERC20(game.token).safeTransfer(_winners[i], totalBet * winners[i] / 1000);
 
-        if (game.token == litlabToken) {
-            ILitlabGamesToken(game.token).burn(game.totalBet * fee / 1000); // Only burn if we are using litlab token
-            IERC20(game.token).safeTransfer(wallet, game.totalBet * rake / 1000);
+        if (token == litlabToken) {    // HACKEN H04
+            ILitlabGamesToken(token).burn(totalBet * rake / 1000); // Only burn if we are using litlab token
+            IERC20(token).safeTransfer(wallet, totalBet * fee / 1000);
         } else {    // Otherwise, take the rake as fee too
-            IERC20(game.token).safeTransfer(wallet, ((game.totalBet * rake) + (game.totalBet * fee)) / 1000);
+            IERC20(token).safeTransfer(wallet, ((totalBet * rake) + (totalBet * fee)) / 1000);
         }
 
         emit onGameFinalized(_gameId, _winners);

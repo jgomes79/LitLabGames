@@ -3,6 +3,7 @@ const CyberTitansGame = artifacts.require("./CyberTitansGame.sol");
 const CyberTitansTournament = artifacts.require("./CyberTitansTournament.sol");
 
 async function doDeploy(deployer, network, accounts) {
+    /*
     const account = accounts[3];
     const payerAccount = accounts[0];
     
@@ -36,7 +37,7 @@ async function doDeploy(deployer, network, accounts) {
     } catch(e) {
         console.error(e);
     }
-
+*/
 }
 
 module.exports = function(deployer, network, accounts) {

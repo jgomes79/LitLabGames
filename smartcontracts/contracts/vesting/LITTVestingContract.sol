@@ -149,22 +149,24 @@ contract LITTVestingContract is Ownable {
 
     /// @notice Internal function to calculate the amount of tokens user can get according the vesting
     function _executeVesting(VestingType _vestingType) internal {
-        VestingData memory data = vestingData[_vestingType];
+        VestingData storage data = vestingData[_vestingType];
+        uint256 amount = data._amount;  // HACKEN M07
         require(block.timestamp >= listing_date + (data._cliffMonths * 30 days), "TooEarly");
-        require(withdrawnBalances[_vestingType] < data._amount, "MaxBalance");
+        require(withdrawnBalances[_vestingType] < amount, "MaxBalance");
 
         if ((data._TGEPercentage > 0) && (withdrawnBalances[_vestingType] == 0)) {
-            uint256 amountToWithdraw = data._TGEPercentage * data._amount / 100;
+            uint256 amountToWithdraw = data._TGEPercentage * amount / 100;
+            data._amount -= amountToWithdraw;   // HACKEN C03
             _sendTokens(wallet, _vestingType, amountToWithdraw);
         } else {
             uint256 start = listing_date + (data._cliffMonths * 30 days);
             uint256 end = start + (uint256(data._months) * 30 days);
             uint256 from = lastWithdraw[_vestingType] == 0 ? start : lastWithdraw[_vestingType];
             uint256 to = block.timestamp > end ? end : block.timestamp;
-            uint256 tokensPerSecond = data._amount / (end - start);
+            uint256 tokensPerSecond = amount / (end - start);
             require(to > from, "Expired");
             uint256 amountToWithdraw = (to - from) * tokensPerSecond;
-            if (amountToWithdraw > data._amount - withdrawnBalances[_vestingType]) amountToWithdraw = data._amount - withdrawnBalances[_vestingType];
+            if (amountToWithdraw > amount - withdrawnBalances[_vestingType]) amountToWithdraw = amount - withdrawnBalances[_vestingType];
 
             _sendTokens(wallet, _vestingType, amountToWithdraw);
         }

@@ -26,7 +26,6 @@ async function doDeploy(deployer, network, accounts) {
     let token = await LitlabGamesToken.deployed();
     console.log('LitlabGamesToken deployed:', token.address);
 
-/*
     await deployer.deploy(LitlabPreStakingBox, token.address, stakingStart, stakingEnd, totalRewards);
     let preStakingBox = await LitlabPreStakingBox.deployed();
     console.log('LitlabPreStakingBox deployed:', preStakingBox.address);
@@ -53,7 +52,7 @@ async function doDeploy(deployer, network, accounts) {
 
     await token.transfer(advisorsTeam.address, advisorsAndTeamAmount);
     console.log(`Sended ${web3.utils.fromWei(advisorsAndTeamAmount,'ether')} to the AdvisorsTeam contract`);
-*/
+
     await deployer.deploy(LitlabForwarder);
     let forwarder = await LitlabForwarder.deployed();
     console.log('LitlabForwarder deployed:', forwarder.address);

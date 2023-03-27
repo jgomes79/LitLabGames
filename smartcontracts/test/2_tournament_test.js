@@ -16,20 +16,23 @@ contract("CyberTitansTournament tests", async(accounts) => {
             await token.approve(cyberTitansTournament.address, maxAmount, {from: accounts[i]});
         }
 
+        // Approve tournament access to accounts[0] (wallet variable)
+        await token.approve(cyberTitansTournament.address, maxAmount, {from: accounts[0]});
+
         const startDate = Math.round(new Date('2023-01-01T00:00:00').getTime() / 1000);
-        const txCreate = await cyberTitansTournament.createTournament(token.address, startDate, web3.utils.toWei('1000'));
+        const txCreate = await cyberTitansTournament.createTournament(token.address, startDate, web3.utils.toWei('1000'), web3.utils.toWei('10000'));
         tournamentId = txCreate.logs[0].args._tournamentId;
         assert.equal(tournamentId, 1);
 
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[1], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[2], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[3], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[4], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[5], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[6], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[7], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[8], false, {from: manager});
-        await cyberTitansTournament.joinTournament(tournamentId, accounts[9], false, {from: manager});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[1]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[2]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[3]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[4]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[5]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[6]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[7]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[8]});
+        await cyberTitansTournament.joinTournament(tournamentId, {from: accounts[9]});
 
         const balance = await token.balanceOf(cyberTitansTournament.address);
         assert.equal(balance, web3.utils.toWei('9000'));
@@ -62,7 +65,7 @@ contract("CyberTitansTournament tests", async(accounts) => {
         const diff3 = web3.utils.fromWei(postBalance3.toString(),'ether') - web3.utils.fromWei(preBalance3.toString(),'ether');
         const diff4 = web3.utils.fromWei(postBalance4.toString(),'ether') - web3.utils.fromWei(preBalance4.toString(),'ether');
 
-        const pot = 9000 - (9000 * 5 / 100);
+        const pot = 10000 - (10000 * 5 / 100);
         assert.equal(diff1, pot * 40/100);
         assert.equal(diff2, pot * 27/100);
         assert.equal(diff3, pot * 19/100);

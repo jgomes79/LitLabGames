@@ -45,6 +45,7 @@ contract LITTAdvisorsTeam is Ownable {
 
     /// @notice Set listing date to start the vesting period
     function setListingDate(uint256 _listingDate) external onlyOwner {
+        require(_listingDate >= block.timestamp, "NoPastDate"); // HACKEN C04
         listing_date = _listingDate;
     }
 
@@ -60,6 +61,10 @@ contract LITTAdvisorsTeam is Ownable {
 
     /// @notice Change the approval wallets
     function setApprovalWallets(address[5] calldata _approvalWallets) external onlyOwner {
+        // HACKEN H09
+        for (uint256 i=0;i<approvalWallets.length; i++) delete teamApprovals[approvalWallets[i]];
+        numTeamApprovals = 0;
+        
         approvalWallets = _approvalWallets;
     }
 
@@ -93,7 +98,13 @@ contract LITTAdvisorsTeam is Ownable {
     /// @notice Function for approve the team tokens withdraw
     function approveTeamWithdraw() external {
         bool authorized;
-        for (uint256 i=0; i<approvalWallets.length; i++) if (approvalWallets[i] == msg.sender) authorized = true;
+        uint256 walletsLength = approvalWallets.length; // HACKEN M08
+        for (uint256 i=0; i<walletsLength; i++) {
+            if (approvalWallets[i] == msg.sender) {
+                authorized = true;
+                break;
+            }
+        }
         require(authorized, "NotAuthorized");
 
         if (teamApprovals[msg.sender] == false) {
@@ -109,7 +120,8 @@ contract LITTAdvisorsTeam is Ownable {
         require(TEAM_AMOUNT - teamWithdrawn > 0, "NotAllowed");
     
         numTeamApprovals = 0;
-        for (uint256 i=0; i<approvalWallets.length; i++) delete teamApprovals[approvalWallets[i]];
+        uint256 walletsLength = approvalWallets.length; // HACKEN M09
+        for (uint256 i=0; i<walletsLength; i++) delete teamApprovals[approvalWallets[i]];
         
         uint256 start = listing_date + 180 days;
         uint256 end = start + (42 * 30 days);

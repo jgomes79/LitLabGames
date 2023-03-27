@@ -43,10 +43,16 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     uint16 public fee = 25;
     bool private pause;
 
+    // HACKEN M01
+    event onManagerChanged(address _manager);
+    event onWalletChanged(address _wallet);
+    event onLitlabTokenChanged(address _litlabToken);
+    event onUpdateFees(uint16 _fee, uint16 _rake);
+    event onChangedPause(bool _paused);
+    event onArraysChanged();
     event onTournamentCreated(uint256 _tournamentId);
     event onTournamentFinalized(uint256 _tournamentId);
     event onJoinedTournament(uint256 _id, address _player);
-    //event onRetiredTournament(uint256 _id, address _player);
     event onTournamentStarted(uint256 _id, uint24 _litPlayers, uint24 _cttPlayers);
     event onEmergencyWithdraw(uint256 _balance, address _token);
 
@@ -65,7 +71,7 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         prizes[2] = [3200000, 2200000, 1650000, 1250000, 900000, 800000];
         prizes[3] = [2975000, 1875000, 1475000, 1125000, 850000, 700000, 550000, 450000];
         prizes[4] = [2575000, 1705000, 1100000, 850000, 625000, 500000, 400000, 317000, 241000];
-        prizes[5] = [2000000, 1400000, 945000, 770000, 600000, 500000, 400000, 312500, 164063, 110000];
+        prizes[5] = [2000000, 1400000, 945000, 770000, 600000, 500000, 400000, 312500, 164062, 110000]; // HACKEN H01
         prizes[6] = [1825000, 1325000, 842000, 700000, 562500, 460000, 360000, 265000, 130000, 73001, 45390];
         prizes[7] = [1780000, 1275000, 785000, 609200, 507500, 412000, 320000, 232500, 105000, 51000, 31712, 22000];
 
@@ -92,15 +98,27 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         tops[11] = [65,128];
     }
 
-    function changeWallets(address _manager, address _wallet, address _litlabToken) external onlyOwner {
+    // HACKEN H06
+    function changeManager(address _manager) external onlyOwner {
         manager = _manager;
+        emit onManagerChanged(_manager);
+    }
+
+    function changeWallet(address _wallet) external onlyOwner {
         wallet = _wallet;
+        emit onWalletChanged(_wallet);
+    }
+
+    function changeLitlabToken(address _litlabToken) external onlyOwner {
         litlabToken = _litlabToken;
+        emit onLitlabTokenChanged(_litlabToken);
     }
 
     function updateFees(uint16 _fee, uint16 _rake) external onlyOwner {
         fee = _fee;
         rake = _rake;
+
+        emit onUpdateFees(_fee, _rake);
     }
 
     function changeArrays(uint32[][8] calldata _prizes, uint32[][8] calldata _players, uint32[][12] calldata _tops, uint8[8] calldata _winners) external onlyOwner {
@@ -108,10 +126,13 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         for (uint256 i=0; i<_players.length; i++) players[i] = _players[i];
         for (uint256 i=0; i<_tops.length; i++) tops[i] = _tops[i];
         for (uint256 i=0; i<_winners.length; i++) winners[i] = _winners[i];
+
+        emit onArraysChanged();
     }
 
     function changePause() external onlyOwner {
         pause = !pause;
+        emit onChangedPause(pause);
     }
 
     // To create the tournament only need. Token address, start date, bet for each player and minimum tournament prize
@@ -139,8 +160,9 @@ contract CyberTitansTournament is LitlabContext, Ownable {
 
         TournamentStruct storage tournament = tournaments[_id];
         if (tournament.startDate > 0) require(block.timestamp >= tournament.startDate, "NotStarted");
-        if (tournament.endDate > 0) require(block.timestamp <= tournament.endDate, "Ended");
-        
+        require(tournament.token != address(0), "NoTournament");    // HACKEN C05
+        require(tournament.endDate == 0, "TournamentEnded");
+
         tournament.numOfTokenPlayers++;
         IERC20(tournament.token).safeTransferFrom(_msgSender(), address(this), tournament.playerBet);
 
@@ -166,7 +188,8 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         require(pause == false, "Paused");
         
         TournamentStruct storage tournament = tournaments[_id];
-        require(_cttPlayers == tournament.numOfTokenPlayers, "BadLITTPlayers"); // Check the server reports the same LITT users that we count in the smartcontract
+        // HACKEN C01
+        require(_litPlayers == tournament.numOfTokenPlayers, "BadLITTPlayers"); // Check the server reports the same LITT users that we count in the smartcontract
         tournament.numOfCTTPlayers = _cttPlayers;   // Report the CTT tickets free2play players
 
         emit onTournamentStarted(_id, _litPlayers, _cttPlayers);
@@ -179,7 +202,11 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         require(pause == false, "Paused");
 
         TournamentStruct storage tournament = tournaments[_tournamentId];
+        require(tournament.endDate == 0, "Ended");  // HACKEN H12
         tournament.endDate = uint64(block.timestamp);
+        address token = tournament.token;   // HACKEN M05
+        uint256 assuredAmount = tournament.tournamentAssuredAmount;
+
         // Get the num of players in the tournament
         uint24 numOfPlayers = tournament.numOfTokenPlayers + tournament.numOfCTTPlayers;
         // Get the prizes array
@@ -188,9 +215,9 @@ contract CyberTitansTournament is LitlabContext, Ownable {
 
         // Calculate if we got the minimum assurance token amount for the tournament. Otherwise, the game will add the tokens
         uint256 amountPlayed = tournament.playerBet * tournament.numOfTokenPlayers;
-        if (amountPlayed < tournament.tournamentAssuredAmount) {
-            IERC20(tournament.token).safeTransferFrom(wallet, address(this), tournament.tournamentAssuredAmount - amountPlayed);
-            amountPlayed = tournament.tournamentAssuredAmount;
+        if (amountPlayed < assuredAmount) {
+            IERC20(token).safeTransferFrom(wallet, address(this), assuredAmount - amountPlayed);
+            amountPlayed = assuredAmount;
         }
 
         // Burn those tokens
@@ -206,18 +233,18 @@ contract CyberTitansTournament is LitlabContext, Ownable {
             // Get the player's prize
             uint256 prizePercentage = _getPrize(index, i+1);
             uint256 prize = (pot * prizePercentage) / (10 ** 7);
-            if (prize != 0) IERC20(tournament.token).safeTransfer(_winners[i], prize);
+            if (prize != 0) IERC20(token).safeTransfer(_winners[i], prize);
             ++i;
         } while(i<_winners.length);
 
         // Burn the rake and get the fee
-        if (tournament.token == litlabToken) {
+        if (token == litlabToken) {
             // If we are using litlabtoken, burn the rake
-            ILitlabGamesToken(tournament.token).burn(_rake);
-            IERC20(tournament.token).safeTransfer(wallet, _fee);
+            ILitlabGamesToken(token).burn(_rake);
+            IERC20(token).safeTransfer(wallet, _fee);
         } else {
             // If we are using other token, transfer the rake instead of burning
-            IERC20(tournament.token).safeTransfer(wallet, (_rake + _fee));
+            IERC20(token).safeTransfer(wallet, (_rake + _fee));
         }
 
         emit onTournamentFinalized(_tournamentId);

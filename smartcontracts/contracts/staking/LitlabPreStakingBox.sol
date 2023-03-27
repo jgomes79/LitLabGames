@@ -18,6 +18,7 @@ contract LitlabPreStakingBox is Ownable {
     struct UserStake {
         uint256 amount;
         uint256 withdrawn;
+        uint256 rewardsWithdrawn;
         uint256 lastRewardsWithdrawn;
         uint256 lastUserWithdrawn;
         InvestorType investorType;
@@ -57,6 +58,8 @@ contract LitlabPreStakingBox is Ownable {
     function stake(address[] memory _users, uint256[] memory _amounts, uint8[] memory _investorTypes) external onlyOwner {
         require(_users.length == _amounts.length, "BadLenghts");
         require(_investorTypes.length == _amounts.length, "BadLengths");
+        // HACKEN H11
+        require(stakeStartDate >= block.timestamp, "Started");
         
         uint total = 0;
         for (uint256 i=0; i<_users.length; i++) {
@@ -68,6 +71,7 @@ contract LitlabPreStakingBox is Ownable {
             balances[user] = UserStake({
                 amount: amount,
                 withdrawn: 0,
+                rewardsWithdrawn: 0,
                 lastRewardsWithdrawn: 0,
                 lastUserWithdrawn: 0,
                 investorType: investorType,
@@ -102,9 +106,10 @@ contract LitlabPreStakingBox is Ownable {
         require(balances[msg.sender].withdrawnFirst == false, "Withdrawn");
         require(block.timestamp >= stakeStartDate, "NotYet");
 
-        (, , , , , uint256 pendingRewards) = _getData(msg.sender);
+        uint256 pendingRewards = _getPendingRewards(msg.sender);    // HACKEN M10
         require(pendingRewards > 0, "NoRewardsToClaim");
 
+        balances[msg.sender].rewardsWithdrawn += pendingRewards;
         balances[msg.sender].lastRewardsWithdrawn = block.timestamp;
         IERC20(token).safeTransfer(msg.sender, pendingRewards);
 
@@ -116,24 +121,30 @@ contract LitlabPreStakingBox is Ownable {
         require(balances[msg.sender].amount > 0, "NoStaked");
         require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "Max");
 
-        (uint256 userAmount, , , , , uint256 pendingRewards) = _getData(msg.sender);
+        // HACKEN M11
+        uint256 userAmount = balances[msg.sender].amount;
+        uint256 pendingRewards = _getPendingRewards(msg.sender);
         uint256 tokensToSend = 0;
         if (balances[msg.sender].withdrawnFirst == false) {
             // This is the last time this user can get rewards, and the rest of the rewards are splitted for the other users.
             totalStakedAmount -= userAmount;
-            totalRewards -= pendingRewards;
+            totalRewards -= balances[msg.sender].rewardsWithdrawn; 
 
             uint256 tokens = _calculateVestingTokens(msg.sender);
-            balances[msg.sender].withdrawn += tokens;
+            // HACKEN C02
             balances[msg.sender].lastUserWithdrawn = block.timestamp;
+            balances[msg.sender].rewardsWithdrawn += pendingRewards;
+
+            balances[msg.sender].withdrawn += tokens;
             balances[msg.sender].withdrawnFirst = true;
 
             tokensToSend = tokens + pendingRewards;
             IERC20(token).safeTransfer(msg.sender, tokensToSend);
         } else {
+            // HACKEN C02
             tokensToSend = _calculateVestingTokens(msg.sender);
-            balances[msg.sender].withdrawn += tokensToSend;
             balances[msg.sender].lastUserWithdrawn = block.timestamp;
+            balances[msg.sender].withdrawn += tokensToSend;
 
             IERC20(token).safeTransfer(msg.sender, tokensToSend);
         }
@@ -172,7 +183,8 @@ contract LitlabPreStakingBox is Ownable {
 
         uint256 from = balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn;
         uint256 to = block.timestamp > stakeStartDate + vestingDays ? stakeStartDate + vestingDays : block.timestamp;
-        uint256 diffTime = from <= to ? to - from : 0;
+
+        uint256 diffTime = to >= from ? to - from : 0;
         uint256 tokens = diffTime * tokensPerSec;
         if (balances[_user].amount - balances[_user].withdrawn < tokens) tokens = balances[_user].amount - balances[_user].withdrawn;
 
@@ -189,8 +201,18 @@ contract LitlabPreStakingBox is Ownable {
         uint256 from = lastRewardsWithdraw == 0 ? stakeStartDate : lastRewardsWithdraw;
         uint256 to = block.timestamp > stakeEndDate ? stakeEndDate : block.timestamp;
 
-        if (totalStakedAmount > 0) {
-            rewardsTokensPerSec = (totalRewards * (balances[_user].amount / 10 ** 18)) / ((stakeEndDate - stakeStartDate) * (totalStakedAmount / 10 ** 18));
+        if ((totalStakedAmount != 0) && (to >= from)) {   // HACKEN H03
+            rewardsTokensPerSec = (totalRewards * (balances[_user].amount)) / ((stakeEndDate - stakeStartDate) * (totalStakedAmount));
+            pendingRewards = balances[_user].withdrawnFirst == false ? (to - from) * rewardsTokensPerSec : 0;
+        }
+    }
+
+    function _getPendingRewards(address _user) internal view returns (uint256 pendingRewards) {
+        uint256 from = balances[_user].lastRewardsWithdrawn == 0 ? stakeStartDate : balances[_user].lastRewardsWithdrawn;
+        uint256 to = block.timestamp > stakeEndDate ? stakeEndDate : block.timestamp;
+
+        if ((totalStakedAmount != 0) && (to >= from)) {
+            uint256 rewardsTokensPerSec = (totalRewards * (balances[_user].amount)) / ((stakeEndDate - stakeStartDate) * (totalStakedAmount));
             pendingRewards = balances[_user].withdrawnFirst == false ? (to - from) * rewardsTokensPerSec : 0;
         }
     }
