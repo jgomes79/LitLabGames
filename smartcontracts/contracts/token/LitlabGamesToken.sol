@@ -21,12 +21,15 @@ interface IAntisnipe {
 contract LitlabGamesToken is ERC20Permit, Ownable {
     IAntisnipe public antisnipe;
     bool public antisnipeDisable;
+    uint256 private constant MINT_AMOUNT = 3_000_000_000 * 10 ** 18;
+
+    event AntisnipeDisabled();
 
     constructor(address _antisnipe) ERC20("LitlabToken", "LITT") ERC20Permit("LitlabToken") {  
-        _mint(msg.sender, 3_000_000_000 * 10 ** 18);
+        _mint(msg.sender, MINT_AMOUNT);
 
         // Change the set to the constructor to ensure nobody can call setAntisnipeAddress more than once
-        // with a malicius code to intercept the transfers.
+        // with a malicious code to intercept the transfers.
         if (_antisnipe != address(0)) antisnipe = IAntisnipe(_antisnipe);
     }
 
@@ -35,7 +38,7 @@ contract LitlabGamesToken is ERC20Permit, Ownable {
     }
 
     function disableAntisnipe() external onlyOwner {
-        require(!antisnipeDisable);
+        require(!antisnipeDisable, "ASDisabled");
         antisnipeDisable = true;
 
         // Burn the token ownership. Will never activate the antisnipe again.
@@ -44,6 +47,8 @@ contract LitlabGamesToken is ERC20Permit, Ownable {
         // Better be sure that antisnipe is only active at the beginning for the listing and forget about it
         // burning the owner key and assuring nobody can activate it again
         _transferOwnership(address(0));
+
+        emit AntisnipeDisabled();
     }
 
     function _beforeTokenTransfer(

@@ -19,15 +19,16 @@ contract LITTVestingContract is Ownable {
         FARMING
     }
 
-    uint256 immutable public NEW_GAMES_AMOUNT = 690000000 * 10 ** 18;
-    uint256 immutable public MARKETING_AMOUNT = 150000000 * 10 ** 18;
-    uint256 immutable public LIQUID_RESERVES_AMOUNT = 210000000 * 10 ** 18;
-    uint256 immutable public AIRDROPS_AMOUNT = 30000000 * 10 ** 18;
-    uint256 immutable public INGAME_REWARDS_AMOUNT = 325000000 * 10 ** 18;
-    uint256 immutable public FARMING_AMOUNT = 420000000 * 10 ** 18;
+    uint256 constant public NEW_GAMES_AMOUNT = 690000000 * 10 ** 18;
+    uint256 constant public MARKETING_AMOUNT = 150000000 * 10 ** 18;
+    uint256 constant public LIQUID_RESERVES_AMOUNT = 210000000 * 10 ** 18;
+    uint256 constant public AIRDROPS_AMOUNT = 30000000 * 10 ** 18;
+    uint256 constant public INGAME_REWARDS_AMOUNT = 325000000 * 10 ** 18;
+    uint256 constant public FARMING_AMOUNT = 420000000 * 10 ** 18;
 
     struct VestingData {
         uint256 _amount;
+        uint256 _amountTGE;
         uint24 _TGEPercentage;
         uint8 _months;
         uint8 _cliffMonths;
@@ -41,34 +42,43 @@ contract LITTVestingContract is Ownable {
     address public wallet;
     uint256 public listing_date;
     
-    event onWithdrawToken(address _wallet, uint256 _amount);
-    event onEmergencyWithdraw();
+    event ListingDated(uint256 _listingDate);
+    event WalletChanged(address _wallet);
+    event TokenWithdrawn(address indexed _wallet, uint256 _amount);
+    event EmergencyWithdrawn();
 
     /// @notice Set the token address, the withdraw wallet and the vesting amounts
     constructor(address _token, address _wallet) {
+        require(_token != address(0), "ZeroAddress");
+        require(_wallet != address(0), "ZeroAddress");
+
         token = _token;
         wallet = _wallet;
 
         vestingData[VestingType.NEW_GAMES] = VestingData({
             _amount: NEW_GAMES_AMOUNT,
+            _amountTGE: 0,
             _months: 0,
             _cliffMonths: 12,
             _TGEPercentage: 0
         });
         vestingData[VestingType.MARKETING] = VestingData({
             _amount: MARKETING_AMOUNT,
+            _amountTGE: MARKETING_AMOUNT * 5 / 100,
             _months: 18,
             _cliffMonths: 0,
             _TGEPercentage: 5
         });
         vestingData[VestingType.LIQUID_RESERVES] = VestingData({
             _amount: LIQUID_RESERVES_AMOUNT,
+            _amountTGE: 0,
             _months: 24,
             _cliffMonths: 0,
             _TGEPercentage: 0
         });
         vestingData[VestingType.AIRDROPS] = VestingData({
             _amount: AIRDROPS_AMOUNT,
+            _amountTGE: AIRDROPS_AMOUNT * 10 / 100,
             _months: 12,
             _cliffMonths: 0,
             _TGEPercentage: 10
@@ -77,12 +87,18 @@ contract LITTVestingContract is Ownable {
 
     /// @notice Set TGE date (listing date)
     function setListingDate(uint256 _listingDate) external onlyOwner {
+        require(_listingDate >= block.timestamp, "NoPastDate");
         listing_date = _listingDate;
+
+        emit ListingDated(_listingDate);
     }
 
     /// @notice Change the Company wallet
     function changeWallet(address _wallet) external onlyOwner {
+        require(_wallet != address(0), "ZeroAddress");
         wallet = _wallet;
+
+        emit WalletChanged(_wallet);
     }
 
     /// @notice Get vesting data
@@ -98,8 +114,8 @@ contract LITTVestingContract is Ownable {
     /// @notice Withdraw from New Games pool (not vested)
     function withdrawNewGames(uint256 _amount) external {
         // Free Withdraw
-        require(withdrawnBalances[VestingType.NEW_GAMES] + _amount <= NEW_GAMES_AMOUNT, "Max");
-        _sendTokens(wallet, VestingType.NEW_GAMES, _amount);
+        require(withdrawnBalances[VestingType.NEW_GAMES] + _amount <= NEW_GAMES_AMOUNT, "CantWithdrawMore");
+        _sendTokens(wallet, VestingType.NEW_GAMES, _amount, false);
     }
 
     /// @notice Withdraw from Marketing pool (vested)
@@ -123,15 +139,15 @@ contract LITTVestingContract is Ownable {
     /// @notice Withdraw from InGame pool (not vested)
     function withdrawInGameRewards(uint256 _amount) external {
         // Free withdraw
-        require(withdrawnBalances[VestingType.INGAME_REWARDS] + _amount <= INGAME_REWARDS_AMOUNT, "Max");
-        _sendTokens(wallet, VestingType.INGAME_REWARDS, _amount);
+        require(withdrawnBalances[VestingType.INGAME_REWARDS] + _amount <= INGAME_REWARDS_AMOUNT, "CantWithdrawMore");
+        _sendTokens(wallet, VestingType.INGAME_REWARDS, _amount, false);
     }
 
     /// @notice Withdraw from Farming pool (not vested)
     function withdrawFarming(uint256 _amount) external {
         // Free withdraw
-        require(withdrawnBalances[VestingType.FARMING] + _amount <= FARMING_AMOUNT, "Max");
-        _sendTokens(wallet, VestingType.FARMING, _amount);
+        require(withdrawnBalances[VestingType.FARMING] + _amount <= FARMING_AMOUNT, "CantWithdrawMore");
+        _sendTokens(wallet, VestingType.FARMING, _amount, false);
     }
 
     /// @notice Get the tokens in the contract
@@ -144,39 +160,41 @@ contract LITTVestingContract is Ownable {
         uint256 balance = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransfer(msg.sender, balance);
 
-        emit onEmergencyWithdraw();
+        emit EmergencyWithdrawn();
     }
 
     /// @notice Internal function to calculate the amount of tokens user can get according the vesting
     function _executeVesting(VestingType _vestingType) internal {
         VestingData storage data = vestingData[_vestingType];
-        uint256 amount = data._amount;  // HACKEN M07
+        uint256 amount = data._amount;
+        uint256 amountTGE = data._amountTGE;
         require(block.timestamp >= listing_date + (data._cliffMonths * 30 days), "TooEarly");
         require(withdrawnBalances[_vestingType] < amount, "MaxBalance");
 
         if ((data._TGEPercentage > 0) && (withdrawnBalances[_vestingType] == 0)) {
-            uint256 amountToWithdraw = data._TGEPercentage * amount / 100;
-            data._amount -= amountToWithdraw;   // HACKEN C03
-            _sendTokens(wallet, _vestingType, amountToWithdraw);
+            _sendTokens(wallet, _vestingType, data._amountTGE, true);
         } else {
             uint256 start = listing_date + (data._cliffMonths * 30 days);
             uint256 end = start + (uint256(data._months) * 30 days);
-            uint256 from = lastWithdraw[_vestingType] == 0 ? start : lastWithdraw[_vestingType];
-            uint256 to = block.timestamp > end ? end : block.timestamp;
-            uint256 tokensPerSecond = amount / (end - start);
-            require(to > from, "Expired");
-            uint256 amountToWithdraw = (to - from) * tokensPerSecond;
-            if (amountToWithdraw > amount - withdrawnBalances[_vestingType]) amountToWithdraw = amount - withdrawnBalances[_vestingType];
-
-            _sendTokens(wallet, _vestingType, amountToWithdraw);
+            uint256 amountToWithdraw;
+            if (block.timestamp < end) {
+                uint256 from = lastWithdraw[_vestingType] == 0 ? start : lastWithdraw[_vestingType];
+                uint256 to = block.timestamp;
+                uint256 tokensPerSecond = (amount - amountTGE) / (end - start);
+                amountToWithdraw = (to - from) * tokensPerSecond;
+            } else {
+                // This is the last time users can withdraw, so he withdraws all their remaining tokens
+                amountToWithdraw = amount - withdrawnBalances[_vestingType];
+            }
+            _sendTokens(wallet, _vestingType, amountToWithdraw, false);
         }
     }
 
-    function _sendTokens(address _wallet, VestingType _vestingType, uint256 _amount) internal {
+    function _sendTokens(address _wallet, VestingType _vestingType, uint256 _amount, bool _tge) internal {
         withdrawnBalances[_vestingType] += _amount;
-        lastWithdraw[_vestingType] = block.timestamp;
+        if (!_tge) lastWithdraw[_vestingType] = block.timestamp;
         IERC20(token).safeTransfer(_wallet, _amount);
 
-        emit onWithdrawToken(_wallet, _amount);
+        emit TokenWithdrawn(_wallet, _amount);
     }
 }

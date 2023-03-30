@@ -52,6 +52,8 @@ contract("LITTAdvisorsTeamContract tests", async(accounts) => {
     it("1. Setup should work", async () => {
         let advisorsteam = await LITTAdvisorsTeam.deployed();
     
+        await advisorsteam.setApprovalWallets([accounts[1], accounts[2], accounts[3], accounts[4], accounts[5]])
+
         let now = Math.round(new Date().getTime() / 1000);
         let listingDate = now;
         await advisorsteam.setListingDate(listingDate);
@@ -60,24 +62,32 @@ contract("LITTAdvisorsTeamContract tests", async(accounts) => {
     it("2. Team should withdraw", async () => {
         let advisorsteam = await LITTAdvisorsTeam.deployed();
 
+        let tokensInitial = await advisorsteam.getTokensInContract();
+        tokensInitial = web3.utils.fromWei(tokensInitial.toString(),'ether');
+
         let now = Math.round(new Date().getTime() / 1000);
         let listingDate = now + 30 * 24 * 3600;
-        for (let i=0; i<365*5; i++) {
+        for (let i=0; i<48; i++) {
             await increaseTo(listingDate);
             console.log('SIMULATING DAY: ', new Date(listingDate*1000).toISOString());
             try {
-                let tokensLeft = await advisorsteam.getTokensInContract();
-                console.log('TOKENS WITHDRAW TEAM -> Tokens left: ', web3.utils.fromWei(tokensLeft.toString(),'ether'));   
-                
-                const tx = advisorsteam.teamWithdraw();
+                await advisorsteam.approveTeamWithdraw({from: accounts[1]});
+                await advisorsteam.approveTeamWithdraw({from: accounts[2]});
+                await advisorsteam.approveTeamWithdraw({from: accounts[3]});
 
-                tokensLeft = await advisorsteam.getTokensInContract();
-                console.log('TOKENS WITHDRAW TEAM -> Tokens left: ', web3.utils.fromWei(tokensLeft.toString(),'ether'));   
-            } catch(e) {
+                await advisorsteam.teamWithdraw();
+          } catch(e) {
                 console.log('ERROR WITHDRAW TEAM: ', e.toString());
             }
     
             listingDate += 30 * 86400;
         }
+
+        let tokensLeft = await advisorsteam.getTokensInContract();
+        tokensLeft = web3.utils.fromWei(tokensLeft.toString(),'ether');
+
+        // The team withdraws 420.000.000 tokens according to test 1. The difference of tokens should be 420.000.000
+        const diff = tokensInitial - tokensLeft;
+        assert.equal(diff, 420000000);
     });
 });

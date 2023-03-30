@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v4.7.0) (access/Ownable.sol)
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.17;
 
 /// @title Ownable
-/// @notice Copied from openzeppelin Ownable contract and adapted to add the functionlity of claim ownership by another wallet instead of sending the ownership.
+/// @notice Copied from openzeppelin Ownable contract and adapted to add the functionality of claim ownership by another wallet instead of sending the ownership.
 /// This is to avoid errors sending the permission to an address with no private key (example. A SmartContract or an address with the missing private key)
 abstract contract Ownable {
     address public owner;
@@ -13,13 +13,13 @@ abstract contract Ownable {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event NewOwnershipProposed(address indexed previousOwner, address indexed newOwner);
 
-    constructor() {
-        _transferOwnership(msg.sender);
-    }
-
     modifier onlyOwner() {
         require(owner == msg.sender, "OnlyOwner");
         _;
+    }
+
+    constructor() {
+        _transferOwnership(msg.sender);
     }
 
     function proposeChangeOwner(address newOwner) external onlyOwner {

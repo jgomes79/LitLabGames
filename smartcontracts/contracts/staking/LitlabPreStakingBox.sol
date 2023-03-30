@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
 
 /// PRESTAKING BOX
-/// @notice Staking contract for investors. At deployement we send all the tokens for each investor to this contract with a plus amount of rewards
+/// @notice Staking contract for investors. At deployment we send all the tokens for each investor to this contract with a plus amount of rewards
 contract LitlabPreStakingBox is Ownable {
     using SafeERC20 for IERC20;
 
@@ -26,18 +26,21 @@ contract LitlabPreStakingBox is Ownable {
         bool withdrawnFirst;
     }
 
-    address public token;
-    uint256 public stakeStartDate;
-    uint256 public stakeEndDate;
-    uint256 public totalStakedAmount;
+    address immutable public token;
+    uint256 immutable public stakeStartDate;
+    uint256 immutable public stakeEndDate;
     uint256 public totalRewards;
+    uint256 public totalStakedAmount;
+
+    uint8 constant public INITIAL_WITHDRAW_PERCENTAGE = 15;
 
     mapping(address => UserStake) private balances;
 
-    event onInitialWithdraw(address _user, uint256 _amount);
-    event onWithdrawRewards(address _user, uint256 _rewards);
-    event onWithdraw(address _user, uint256 _amount);
-    event onEmergencyWithdraw();
+    event InitialStaked();
+    event InitialWithdrawn(address indexed _user, uint256 _amount);
+    event RewardsWithdrawn(address indexed _user, uint256 _rewards);
+    event Withdrawn(address indexed _user, uint256 _amount);
+    event EmergencyWithdrawn();
 
     /// @notice Constructor
     /// @param _token Address of the litlab token
@@ -45,6 +48,8 @@ contract LitlabPreStakingBox is Ownable {
     /// @param _stakeEndDate End date of staking
     /// @param _totalRewards Rewards for the staking   
     constructor(address _token, uint256 _stakeStartDate, uint256 _stakeEndDate, uint256 _totalRewards) {
+        require(_token != address(0), "ZeroAddress");
+
         token = _token;
         stakeStartDate = _stakeStartDate;
         stakeEndDate = _stakeEndDate;
@@ -52,24 +57,24 @@ contract LitlabPreStakingBox is Ownable {
     }
 
     /// @notice Stake function. Call at the deployment by the owner only one time to fill the investors amounts
+    /// @notice This function doesn't take the tokens from any wallets. Litlabgames will send all the investor's tokens and the rewards
+    /// @notice to this SmartContract after deployed. So, we assume right tokens amount will be in the contract after stake function is called
     /// @param _users Array with all the address of the investors
     /// @param _amounts Array with the investment amounts
     /// @param _investorTypes Array with the investor types (to calculate the vesting period)
     function stake(address[] memory _users, uint256[] memory _amounts, uint8[] memory _investorTypes) external onlyOwner {
-        require(_users.length == _amounts.length, "BadLenghts");
+        require(_users.length == _amounts.length, "BadLengths");
         require(_investorTypes.length == _amounts.length, "BadLengths");
-        // HACKEN H11
         require(stakeStartDate >= block.timestamp, "Started");
         
-        uint total = 0;
-        for (uint256 i=0; i<_users.length; i++) {
-            address user = _users[i];
-            uint256 amount = _amounts[i];
+        uint256 total = 0;
+        for (uint256 i=0; i<_users.length; ) {
             InvestorType investorType = InvestorType(_investorTypes[i]);
-            require(amount > 0, "BadAmount");
+            require(_users[i] != address(0), "ZeroAddress");
+            require(_amounts[i] != 0, "BadAmount");
 
-            balances[user] = UserStake({
-                amount: amount,
+            balances[_users[i]] = UserStake({
+                amount: _amounts[i],
                 withdrawn: 0,
                 rewardsWithdrawn: 0,
                 lastRewardsWithdrawn: 0,
@@ -79,69 +84,72 @@ contract LitlabPreStakingBox is Ownable {
                 withdrawnFirst: false
             });
 
-            total += amount;
+            total += _amounts[i];
+
+            unchecked {
+                ++i;
+            }
         }
 
         totalStakedAmount = total;
+
+        emit InitialStaked();
     }
 
     /// @notice At TGE users can withdraw the 15% of their investment. Only one time
     function withdrawInitial() external {
         require(block.timestamp >= stakeStartDate, "NotTGE");
         require(balances[msg.sender].amount != 0, "NoStaked");
-        require(balances[msg.sender].claimedInitial == false, "Claimed");
+        require(!balances[msg.sender].claimedInitial, "Claimed");
 
-        uint256 amount = balances[msg.sender].amount * 15 / 100;
+        uint256 amount = balances[msg.sender].amount * INITIAL_WITHDRAW_PERCENTAGE / 100;
         balances[msg.sender].withdrawn += amount;
         balances[msg.sender].claimedInitial = true;
 
         IERC20(token).safeTransfer(msg.sender, amount);
 
-        emit onInitialWithdraw(msg.sender, amount);
+        emit InitialWithdrawn(msg.sender, amount);
     }
 
     /// @notice Users can withdraw rewards whenever they want with no penalty only if they don't withdraw previously
     function withdrawRewards() external {
         require(balances[msg.sender].amount != 0, "NoStaked");
-        require(balances[msg.sender].withdrawnFirst == false, "Withdrawn");
+        require(!balances[msg.sender].withdrawnFirst, "Withdrawn");
         require(block.timestamp >= stakeStartDate, "NotYet");
 
-        uint256 pendingRewards = _getPendingRewards(msg.sender);    // HACKEN M10
+        uint256 pendingRewards = _getPendingRewards(msg.sender);
         require(pendingRewards > 0, "NoRewardsToClaim");
 
         balances[msg.sender].rewardsWithdrawn += pendingRewards;
         balances[msg.sender].lastRewardsWithdrawn = block.timestamp;
         IERC20(token).safeTransfer(msg.sender, pendingRewards);
 
-        emit onWithdrawRewards(msg.sender, pendingRewards);
+        emit RewardsWithdrawn(msg.sender, pendingRewards);
     }
 
-    /// @notice Users withdraws all the balance according their vesting, but they couldn't withdraw rewards any more with the witdrawRewards function
+    /// @notice Users withdraws all the balance according their vesting, but they couldn't withdraw rewards any more with the withdrawRewards function
     function withdraw() external {
         require(balances[msg.sender].amount > 0, "NoStaked");
-        require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "Max");
+        require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "CantWithdrawMore");
 
-        // HACKEN M11
         uint256 userAmount = balances[msg.sender].amount;
-        uint256 pendingRewards = _getPendingRewards(msg.sender);
         uint256 tokensToSend = 0;
-        if (balances[msg.sender].withdrawnFirst == false) {
-            // This is the last time this user can get rewards, and the rest of the rewards are splitted for the other users.
-            totalStakedAmount -= userAmount;
-            totalRewards -= balances[msg.sender].rewardsWithdrawn; 
-
+        if (!balances[msg.sender].withdrawnFirst) {
+            uint256 pendingRewards = _getPendingRewards(msg.sender);
             uint256 tokens = _calculateVestingTokens(msg.sender);
-            // HACKEN C02
+
             balances[msg.sender].lastUserWithdrawn = block.timestamp;
             balances[msg.sender].rewardsWithdrawn += pendingRewards;
-
             balances[msg.sender].withdrawn += tokens;
             balances[msg.sender].withdrawnFirst = true;
+
+            // This is the last time this user can get rewards, and the rest of the rewards are split for the other users.
+            totalStakedAmount -= userAmount;
+            totalRewards -= balances[msg.sender].rewardsWithdrawn; 
 
             tokensToSend = tokens + pendingRewards;
             IERC20(token).safeTransfer(msg.sender, tokensToSend);
         } else {
-            // HACKEN C02
             tokensToSend = _calculateVestingTokens(msg.sender);
             balances[msg.sender].lastUserWithdrawn = block.timestamp;
             balances[msg.sender].withdrawn += tokensToSend;
@@ -149,7 +157,7 @@ contract LitlabPreStakingBox is Ownable {
             IERC20(token).safeTransfer(msg.sender, tokensToSend);
         }
 
-        emit onWithdraw(msg.sender, tokensToSend);
+        emit Withdrawn(msg.sender, tokensToSend);
     }
 
     /// @notice Get the data for each user (to show in the frontend dapp)
@@ -164,10 +172,11 @@ contract LitlabPreStakingBox is Ownable {
 
     /// @notice If there's any problem, contract owner can withdraw all funds (this is not a public and open stake, it's only for authorized investors)
     function emergencyWithdraw() external onlyOwner {
+        require(token != address(0), "ZeroAddress");
         uint256 balance = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransfer(msg.sender, balance);
 
-        emit onEmergencyWithdraw();
+        emit EmergencyWithdrawn();
     }
 
     /// @notice Calculate the token vesting according the investor type
@@ -178,15 +187,18 @@ contract LitlabPreStakingBox is Ownable {
         else if (investorType == InvestorType.SEED) vestingDays = 30 * 30 days;
         else if (investorType == InvestorType.STRATEGIC) vestingDays = 24 * 30 days;
 
-        uint256 amountMinusFirstWithdraw = balances[_user].amount - (balances[_user].amount * 15 / 100);
+        uint256 amountMinusFirstWithdraw = balances[_user].amount - (balances[_user].claimedInitial ? balances[_user].amount * INITIAL_WITHDRAW_PERCENTAGE / 100 : 0);
         uint256 tokensPerSec = amountMinusFirstWithdraw / vestingDays;
 
-        uint256 from = balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn;
-        uint256 to = block.timestamp > stakeStartDate + vestingDays ? stakeStartDate + vestingDays : block.timestamp;
-
-        uint256 diffTime = to >= from ? to - from : 0;
-        uint256 tokens = diffTime * tokensPerSec;
-        if (balances[_user].amount - balances[_user].withdrawn < tokens) tokens = balances[_user].amount - balances[_user].withdrawn;
+        uint256 tokens;
+        if (block.timestamp < stakeStartDate + vestingDays) {
+            uint256 from = balances[_user].lastUserWithdrawn == 0 ? stakeStartDate : balances[_user].lastUserWithdrawn;
+            uint256 to = block.timestamp;
+            uint256 diffTime = to - from;
+            tokens = diffTime * tokensPerSec;
+        } else {
+            tokens = balances[_user].amount - balances[_user].withdrawn;
+        }
 
         return tokens;
     }
@@ -201,9 +213,9 @@ contract LitlabPreStakingBox is Ownable {
         uint256 from = lastRewardsWithdraw == 0 ? stakeStartDate : lastRewardsWithdraw;
         uint256 to = block.timestamp > stakeEndDate ? stakeEndDate : block.timestamp;
 
-        if ((totalStakedAmount != 0) && (to >= from)) {   // HACKEN H03
-            rewardsTokensPerSec = (totalRewards * (balances[_user].amount)) / ((stakeEndDate - stakeStartDate) * (totalStakedAmount));
-            pendingRewards = balances[_user].withdrawnFirst == false ? (to - from) * rewardsTokensPerSec : 0;
+        if ((totalStakedAmount != 0) && (to >= from)) {
+            rewardsTokensPerSec = (totalRewards * (balances[_user].amount)) / ((stakeEndDate - stakeStartDate) * totalStakedAmount);
+            pendingRewards = !balances[_user].withdrawnFirst ? (to - from) * rewardsTokensPerSec : 0;
         }
     }
 
@@ -212,8 +224,8 @@ contract LitlabPreStakingBox is Ownable {
         uint256 to = block.timestamp > stakeEndDate ? stakeEndDate : block.timestamp;
 
         if ((totalStakedAmount != 0) && (to >= from)) {
-            uint256 rewardsTokensPerSec = (totalRewards * (balances[_user].amount)) / ((stakeEndDate - stakeStartDate) * (totalStakedAmount));
-            pendingRewards = balances[_user].withdrawnFirst == false ? (to - from) * rewardsTokensPerSec : 0;
+            uint256 rewardsTokensPerSec = (totalRewards * (balances[_user].amount)) / ((stakeEndDate - stakeStartDate) * totalStakedAmount);
+            pendingRewards = !balances[_user].withdrawnFirst ? (to - from) * rewardsTokensPerSec : 0;
         }
     }
 }

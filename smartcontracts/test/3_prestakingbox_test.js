@@ -50,7 +50,7 @@ async function increaseTo (target) {
 async function withdrawRewards(from, now) {
     try {
         let stakingBox = await LitlabPreStakingBox.deployed();
-        const data = await stakingBox.getData(from);
+        //const data = await stakingBox.getData(from);
 /*
         console.log({
             userAmount: web3.utils.fromWei(data.userAmount.toString(),'ether'),
@@ -75,15 +75,15 @@ async function withdraw(from, now) {
         let stakingBox = await LitlabPreStakingBox.deployed();
         const data = await stakingBox.getData(from);
 
-        console.log({
+        /*console.log({
             userAmount: web3.utils.fromWei(data.userAmount.toString(),'ether'),
             withdrawn: web3.utils.fromWei(data.withdrawn.toString(),'ether'),
             rewardsTokensPerSec: web3.utils.fromWei(data.rewardsTokensPerSec.toString(),'ether'),
             pendingRewards: web3.utils.fromWei(data.pendingRewards.toString(),'ether')
-        });
+        });*/
 
         const tx = await stakingBox.withdraw({from: from});
-        console.log({ user: tx.logs[0].args._user, amount: web3.utils.fromWei(tx.logs[0].args._amount.toString(),'ether') });
+        //console.log({ user: tx.logs[0].args._user, amount: web3.utils.fromWei(tx.logs[0].args._amount.toString(),'ether') });
     } catch(e) {
         console.log('CATCH', from, 'PRESTAKING BOX SIMULATION: ', new Date(now*1000).toISOString(), e.toString());
     }
@@ -110,63 +110,85 @@ const printUsersBalance = async (accounts) => {
 }
 
 contract("LitlabPreStakingBox tests", async(accounts) => {
+    let timeCounter = Math.round((new Date().getTime() / 1000) + (2 * 30 * 24 * 3600));
 
     it("1. Everybody should withdraw initial 15% without penalties", async () => {
         const preStakingBox = await LitlabPreStakingBox.deployed();
 
-        await printUsersBalance(accounts);
-
-        let oneMonthLater = Math.round((new Date().getTime() / 1000) + (1 * 30 * 24 * 3600));
-        await increaseTo(oneMonthLater);
+        await increaseTo(timeCounter);
         for (let i=1; i<9; i++) {
-            const tx = await preStakingBox.withdrawInitial({from: accounts[i]});
-            console.log({ user: tx.logs[0].args._user, amount: web3.utils.fromWei(tx.logs[0].args._amount.toString(),'ether')});
+            try {
+                const tx = await preStakingBox.withdrawInitial({from: accounts[i]});
+                console.log({ user: tx.logs[0].args._user, amount: web3.utils.fromWei(tx.logs[0].args._amount.toString(),'ether')});
+            } catch(e) {
+                console.log(e);
+            }
         }
 
         await printUsersBalance(accounts);
     });
 
     it("2. Everybody withdraw rewards", async () => {
-        let oneMonthLater = Math.round((new Date().getTime() / 1000) + (6 *30 * 24 * 3600));
+        const preStakingBox = await LitlabPreStakingBox.deployed();
 
-        await increaseTo(oneMonthLater);
+        timeCounter = Math.round((new Date().getTime() / 1000) + (6 * 30 * 24 * 3600));
+        await increaseTo(timeCounter);
 
-        await withdrawRewards(accounts[1], oneMonthLater);
-        await withdrawRewards(accounts[2], oneMonthLater);
-        await withdrawRewards(accounts[3], oneMonthLater);
-        await withdrawRewards(accounts[4], oneMonthLater);
-        await withdrawRewards(accounts[5], oneMonthLater);
-        await withdrawRewards(accounts[6], oneMonthLater);
-        await withdrawRewards(accounts[7], oneMonthLater);
-        await withdrawRewards(accounts[8], oneMonthLater);
+        let tokensInitial = await preStakingBox.getTokensInContract();
+        tokensInitial = web3.utils.fromWei(tokensInitial.toString(),'ether');
 
-        await printUsersBalance(accounts);
+        for (let i=0; i<36; i++) {
+            await withdrawRewards(accounts[1], timeCounter);
+            await withdrawRewards(accounts[2], timeCounter);
+            await withdrawRewards(accounts[3], timeCounter);
+            await withdrawRewards(accounts[4], timeCounter);
+            await withdrawRewards(accounts[5], timeCounter);
+            await withdrawRewards(accounts[6], timeCounter);
+            await withdrawRewards(accounts[7], timeCounter);
+            await withdrawRewards(accounts[8], timeCounter);
+
+            timeCounter += (86400 * 30);
+            await increaseTo(timeCounter);
+        }
+
+        let tokensLeft = await preStakingBox.getTokensInContract();
+        tokensLeft = web3.utils.fromWei(tokensLeft.toString(),'ether');
+
+        // We sent 1.000.000 tokens for rewards. If everybody gets its rewards, the result is 999999.999999
+        // We can't force a round because the rewards amount is dinamically
+        const diff = tokensInitial - tokensLeft;
+        assert.isAbove(diff, 999999);
+        assert.isBelow(diff, 1000000);
     });
 
     it("3. Everybody withdraw the main investment", async () => {
-        const token = await LitlabGamesToken.deployed();
         const preStakingBox = await LitlabPreStakingBox.deployed();
-        let startTime = Math.round((new Date().getTime() / 1000) + (12 * 30 * 24 * 3600));
     
-        for (let i=0; i<365*2; i++) {
-            await increaseTo(startTime);
-            console.log('PRESTAKING BOX SIMULATION: ', new Date(startTime*1000).toISOString());
+        let tokensInitial = await preStakingBox.getTokensInContract();
+        tokensInitial = web3.utils.fromWei(tokensInitial.toString(),'ether');
+
+        for (let i=0; i<3; i++) {
+            console.log('PRESTAKING BOX SIMULATION: ', new Date(timeCounter*1000).toISOString());
     
-            await withdraw(accounts[1], startTime);
-            await withdraw(accounts[2], startTime);
-            await withdraw(accounts[3], startTime);
-            await withdraw(accounts[4], startTime);
-            await withdraw(accounts[5], startTime);
-            await withdraw(accounts[6], startTime);
-            await withdraw(accounts[7], startTime);
-            await withdraw(accounts[8], startTime);
-    
-            let tokensLeft = await preStakingBox.getTokensInContract();
-            console.log('TOKENS LEFT IN CONTRACT: ', web3.utils.fromWei(tokensLeft.toString(),'ether'));   
-    
-            startTime += (86400 * 30);
-    
-            await printUsersBalance(accounts);
+            await withdraw(accounts[1], timeCounter);
+            await withdraw(accounts[2], timeCounter);
+            await withdraw(accounts[3], timeCounter);
+            await withdraw(accounts[4], timeCounter);
+            await withdraw(accounts[5], timeCounter);
+            await withdraw(accounts[6], timeCounter);
+            await withdraw(accounts[7], timeCounter);
+            await withdraw(accounts[8], timeCounter);
+   
+            timeCounter += (86400 * 30);
+            await increaseTo(timeCounter);
         }
+
+        // If everybody withdraw the entire rewards plus their investment. Contract balance should be 0 (or between 0 and 0.1 because the decimal round)
+        let tokensLeft = await preStakingBox.getTokensInContract();
+        tokensLeft = web3.utils.fromWei(tokensLeft.toString(),'ether');
+        assert.isAbove(Number(tokensLeft), 0);
+        assert.isBelow(Number(tokensLeft), 0.1);
+
+        await printUsersBalance(accounts);
     });
 });

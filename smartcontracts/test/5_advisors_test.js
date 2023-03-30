@@ -66,24 +66,34 @@ contract("LITTAdvisorsTeamContract tests", async(accounts) => {
    it("2. Advisor should withdraw", async () => {
         let advisorsteam = await LITTAdvisorsTeam.deployed();
 
+        let tokensInitial = await advisorsteam.getTokensInContract();
+        tokensInitial = web3.utils.fromWei(tokensInitial.toString(),'ether');
+        console.log('TOKENS WITHDRAW ADVISORS -> Tokens in contract: ', tokensInitial);   
+
         let now = Math.round(new Date().getTime() / 1000);
         let listingDate = now + 30 * 24 * 3600;
-        for (let i=0; i<365*3; i++) {
+        for (let i=0; i<36; i++) {
             await increaseTo(listingDate);
             console.log('SIMULATING DAY: ', new Date(listingDate*1000).toISOString());
             try {
-                let tokensLeft = await advisorsteam.getTokensInContract();
-                console.log('TOKENS WITHDRAW ADVISORS -> Tokens left: ', web3.utils.fromWei(tokensLeft.toString(),'ether'));   
-                
-                const tx = await advisorsteam.advisorWithdraw({from: accounts[1]});
-
-                tokensLeft = await advisorsteam.getTokensInContract();
-                console.log('TOKENS WITHDRAW ADVISORS -> Tokens left: ', web3.utils.fromWei(tokensLeft.toString(),'ether'));   
+                await advisorsteam.advisorWithdraw({from: accounts[1]});
+                await advisorsteam.advisorWithdraw({from: accounts[2]});
+                await advisorsteam.advisorWithdraw({from: accounts[3]});
+                await advisorsteam.advisorWithdraw({from: accounts[4]});
+                await advisorsteam.advisorWithdraw({from: accounts[5]});
             } catch(e) {
                 console.log('ERROR WITHDRAW ADVISORS: ', e.toString());
             }
     
             listingDate += 30 * 86400;
         }
+
+        let tokensLeft = await advisorsteam.getTokensInContract();
+        tokensLeft = web3.utils.fromWei(tokensLeft.toString(),'ether');
+        console.log('TOKENS WITHDRAW ADVISORS -> Tokens left: ', tokensLeft);   
+
+        // The 5 advisors withdraw 15.000.000 tokens according to test 1. The difference of tokens should be 15.000.000
+        const diff = tokensInitial - tokensLeft;
+        assert.equal(diff, 15000000);
     });
 });
