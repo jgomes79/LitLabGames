@@ -67,7 +67,12 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     }
 
     // Initialize the data and build the matrix according to the tokenomics
-    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken) LitlabContext(_forwarder) {
+    constructor(
+        address _forwarder, 
+        address _manager, 
+        address _wallet, 
+        address _litlabToken
+    ) LitlabContext(_forwarder) {
         require(_forwarder != address(0), "ZeroAddress");
         require(_manager != address(0), "ZeroAddress");
         require(_wallet != address(0), "ZeroAddress");
@@ -105,7 +110,12 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         emit FeesUpdated(_fee, _rake);
     }
 
-    function changeArrays(uint32[][8] calldata _prizes, uint32[][8] calldata _players, uint32[][12] calldata _tops, uint8[8] calldata _winners) external onlyOwner {
+    function changeArrays(
+        uint32[][8] calldata _prizes, 
+        uint32[][8] calldata _players, 
+        uint32[][12] calldata _tops, 
+        uint8[8] calldata _winners
+    ) external onlyOwner {
         for (uint256 i=0; i<_prizes.length; i++) prizes[i] = _prizes[i];
         for (uint256 i=0; i<_players.length; i++) players[i] = _players[i];
         for (uint256 i=0; i<_tops.length; i++) tops[i] = _tops[i];
@@ -121,7 +131,12 @@ contract CyberTitansTournament is LitlabContext, Ownable {
 
     // To create the tournament only need. Token address, start date, bet for each player and minimum tournament prize
     // Returns the tournamentId
-    function createTournament(address _token, uint64 _startDate, uint256 _playerBet, uint256 _tournamentAssuredAmount) external onlyManager notPaused {
+    function createTournament(
+        address _token, 
+        uint64 _startDate, 
+        uint256 _playerBet, 
+        uint256 _tournamentAssuredAmount
+    ) external onlyManager notPaused {
         require(_playerBet != 0, "BadAmount");
         require(_tournamentAssuredAmount != 0, "BadAmount");
         require(_token != address(0), "BadToken");
@@ -169,7 +184,10 @@ contract CyberTitansTournament is LitlabContext, Ownable {
 
     // Server calls this function and the smartcontract give the prizes according the matrix data
     // Server only reports an array with winners. We calculate the prizes
-    function finalizeTournament(uint256 _tournamentId, address[] calldata _winners) external onlyManager notPaused {
+    function finalizeTournament(
+        uint256 _tournamentId,
+        address[] calldata _winners
+    ) external onlyManager notPaused {
         TournamentStruct storage tournament = tournaments[_tournamentId];
         address token = tournament.token;
         uint256 assuredAmount = tournament.tournamentAssuredAmount;

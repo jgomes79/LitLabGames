@@ -186,7 +186,9 @@ contract LITTAdvisorsTeam is Ownable {
     }
 
     /// @notice Get data to the dapp
-    function getAdvisorData(address _wallet) external view returns (uint256 amount, uint256 amountWithdrawn, uint256 end) {
+    function getAdvisorData(
+        address _wallet
+    ) external view returns (uint256 amount, uint256 amountWithdrawn, uint256 end) {
         amount = advisors[_wallet];
         amountWithdrawn = advisorsWithdrawn[_wallet];
         end = listing_date + 90 days + (ADVISORS_MONTHS * 30 days);

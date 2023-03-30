@@ -63,7 +63,13 @@ contract CyberTitansGame is LitlabContext, Ownable {
     }
 
     /// Constructor
-    constructor(address _forwarder, address _manager, address _wallet, address _litlabToken, uint256 _maxBetAmount) LitlabContext(_forwarder) {
+    constructor(
+        address _forwarder, 
+        address _manager, 
+        address _wallet, 
+        address _litlabToken, 
+        uint256 _maxBetAmount
+    ) LitlabContext(_forwarder) {
         require(_forwarder != address(0), "ZeroAddress");
         require(_manager != address(0), "ZeroAddress");
         require(_wallet != address(0), "ZeroAddress");
@@ -133,7 +139,11 @@ contract CyberTitansGame is LitlabContext, Ownable {
 
     /// Check if the wallet has enough tokens to join a game and if they approved the contract to spend their tokens in the litlabgames web page
     /// Returns 0 (Ok), 1 (Not approved), 2 (Not enough balance)
-    function checkWallets(address[] memory _players, uint256 _amount, address _token) external view returns (uint256[] memory) {
+    function checkWallets(
+        address[] memory _players, 
+        uint256 _amount, 
+        address _token
+    ) external view returns (uint256[] memory) {
         uint256[] memory info = new uint256[](_players.length); 
         for (uint256 i=0; i<_players.length; i++) {
             uint256 balance = IERC20(_token).balanceOf(_players[i]);

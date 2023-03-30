@@ -102,7 +102,13 @@ contract LITTVestingContract is Ownable {
     }
 
     /// @notice Get vesting data
-    function getVestingData(uint8 _vestingType) external view returns (uint256 amount, uint24 TGEPercentage, uint8 months, uint8 cliffMonths, uint256 withdrawn) {
+    function getVestingData(uint8 _vestingType) external view returns (
+        uint256 amount, 
+        uint24 TGEPercentage, 
+        uint8 months, 
+        uint8 cliffMonths, 
+        uint256 withdrawn
+    ) {
         VestingData memory data = vestingData[VestingType(_vestingType)];
         amount = data._amount;
         TGEPercentage = data._TGEPercentage;
