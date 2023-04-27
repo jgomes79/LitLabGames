@@ -70,6 +70,7 @@ contract LitlabPreStakingBox is Ownable {
         require(_users.length == _amounts.length, "BadLengths");
         require(_investorTypes.length == _amounts.length, "BadLengths");
         require(stakeStartDate >= block.timestamp, "Started");
+        require(totalStakedAmount == 0, "Initialized");
         
         uint256 total = 0;
         for (uint256 i=0; i<_users.length; ) {
@@ -133,6 +134,7 @@ contract LitlabPreStakingBox is Ownable {
 
     /// @notice Users withdraws all the balance according their vesting, but they couldn't withdraw rewards any more with the withdrawRewards function
     function withdraw() external {
+        require(balances[msg.sender].claimedInitial, "ClaimWithdrawInitialFirst");
         require(balances[msg.sender].amount > 0, "NoStaked");
         require(balances[msg.sender].withdrawn < balances[msg.sender].amount, "CantWithdrawMore");
 
@@ -152,14 +154,13 @@ contract LitlabPreStakingBox is Ownable {
             totalRewards -= balances[msg.sender].rewardsWithdrawn; 
 
             tokensToSend = tokens + pendingRewards;
-            IERC20(token).safeTransfer(msg.sender, tokensToSend);
         } else {
             tokensToSend = _calculateVestingTokens(msg.sender);
             balances[msg.sender].lastUserWithdrawn = block.timestamp;
             balances[msg.sender].withdrawn += tokensToSend;
-
-            IERC20(token).safeTransfer(msg.sender, tokensToSend);
         }
+
+        IERC20(token).safeTransfer(msg.sender, tokensToSend);
 
         emit Withdrawn(msg.sender, tokensToSend);
     }
@@ -198,8 +199,7 @@ contract LitlabPreStakingBox is Ownable {
         else if (investorType == InvestorType.SEED) vestingDays = 30 * 30 days;
         else if (investorType == InvestorType.STRATEGIC) vestingDays = 24 * 30 days;
 
-        uint256 amountMinusFirstWithdraw = balances[_user].amount - 
-            (balances[_user].claimedInitial ? balances[_user].amount * INITIAL_WITHDRAW_PERCENTAGE / 100 : 0);
+        uint256 amountMinusFirstWithdraw = balances[_user].amount - balances[_user].amount * INITIAL_WITHDRAW_PERCENTAGE / 100;
         uint256 tokensPerSec = amountMinusFirstWithdraw / vestingDays;
 
         uint256 tokens;

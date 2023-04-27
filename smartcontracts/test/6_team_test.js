@@ -55,7 +55,7 @@ contract("LITTAdvisorsTeamContract tests", async(accounts) => {
         await advisorsteam.setApprovalWallets([accounts[1], accounts[2], accounts[3], accounts[4], accounts[5]])
 
         let now = Math.round(new Date().getTime() / 1000);
-        let listingDate = now;
+        let listingDate = now + 1;
         await advisorsteam.setListingDate(listingDate);
     });
 
@@ -67,7 +67,7 @@ contract("LITTAdvisorsTeamContract tests", async(accounts) => {
 
         let now = Math.round(new Date().getTime() / 1000);
         let listingDate = now + 30 * 24 * 3600;
-        for (let i=0; i<48; i++) {
+        for (let i=0; i<50; i++) {
             await increaseTo(listingDate);
             console.log('SIMULATING DAY: ', new Date(listingDate*1000).toISOString());
             try {

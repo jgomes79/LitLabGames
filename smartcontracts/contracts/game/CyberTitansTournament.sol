@@ -43,17 +43,16 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     uint16 public fee = 25;
     bool private pause;
 
-    event ManagerChanged(address _manager);
-    event WalletChanged(address _wallet);
-    event LitlabTokenChanged(address _litlabToken);
+    event ManagerChanged(address indexed _manager);
+    event WalletChanged(address indexed _wallet);
+    event LitlabTokenChanged(address indexed _litlabToken);
     event FeesUpdated(uint16 _fee, uint16 _rake);
     event PauseChanged(bool _paused);
-    event ArraysChanged();
     event TournamentCreated(uint256 _tournamentId);
     event TournamentFinalized(uint256 _tournamentId);
     event TournamentJoined(uint256 _id, address indexed _player);
     event TournamentStarted(uint256 _id, uint24 _litPlayers, uint24 _cttPlayers);
-    event EmergencyWithdrawn(uint256 _balance, address _token);
+    event EmergencyWithdrawn(uint256 _balance, address indexed _token);
 
     /// Modifiers
     modifier onlyManager() {
@@ -83,6 +82,10 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         litlabToken = _litlabToken;
 
         _buildArrays();
+
+        emit ManagerChanged(_manager);
+        emit WalletChanged(_wallet);
+        emit LitlabTokenChanged(_wallet);
     }
 
     function changeManager(address _manager) external onlyOwner {
@@ -108,20 +111,6 @@ contract CyberTitansTournament is LitlabContext, Ownable {
         rake = _rake;
 
         emit FeesUpdated(_fee, _rake);
-    }
-
-    function changeArrays(
-        uint32[][8] calldata _prizes, 
-        uint32[][8] calldata _players, 
-        uint32[][12] calldata _tops, 
-        uint8[8] calldata _winners
-    ) external onlyOwner {
-        for (uint256 i=0; i<_prizes.length; i++) prizes[i] = _prizes[i];
-        for (uint256 i=0; i<_players.length; i++) players[i] = _players[i];
-        for (uint256 i=0; i<_tops.length; i++) tops[i] = _tops[i];
-        for (uint256 i=0; i<_winners.length; i++) winners[i] = _winners[i];
-
-        emit ArraysChanged();
     }
 
     function changePause() external onlyOwner {

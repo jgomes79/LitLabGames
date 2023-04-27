@@ -19,31 +19,41 @@ contract LITTVestingContract is Ownable {
         FARMING
     }
 
-    uint256 constant public NEW_GAMES_AMOUNT = 690000000 * 10 ** 18;
+    uint256 constant public NEW_GAMES_AMOUNT = 555000000 * 10 ** 18;
     uint256 constant public MARKETING_AMOUNT = 150000000 * 10 ** 18;
     uint256 constant public LIQUID_RESERVES_AMOUNT = 210000000 * 10 ** 18;
     uint256 constant public AIRDROPS_AMOUNT = 30000000 * 10 ** 18;
     uint256 constant public INGAME_REWARDS_AMOUNT = 325000000 * 10 ** 18;
     uint256 constant public FARMING_AMOUNT = 420000000 * 10 ** 18;
 
+    uint8 constant public NEW_GAMES_CLIFF = 9;
+    uint8 constant public LIQUID_RESERVES_CLIFF = 3;
+
+    uint8 constant public AIRDROPS_UNLOCK_TGE = 15;
+
+    uint8 constant public NEW_GAMES_LINEAR_MONTHS = 54;
+    uint8 constant public MARKETING_LINEAR_MONTHS = 18;
+    uint8 constant public LIQUID_RESERVES_LINEAR_MONTHS = 24;
+    uint8 constant public AIRDROPS_LINEAR_MONTHS = 12;
+
     struct VestingData {
         uint256 _amount;
         uint256 _amountTGE;
-        uint24 _TGEPercentage;
-        uint8 _months;
-        uint8 _cliffMonths;
+        uint256 _TGEPercentage;
+        uint256 _months;
+        uint256 _cliffMonths;
     }
 
     mapping(VestingType => VestingData) private vestingData;
     mapping(VestingType => uint256) public withdrawnBalances;
     mapping(VestingType => uint256) public lastWithdraw;
 
-    address public token;
+    address public immutable token;
     address public wallet;
     uint256 public listing_date;
     
-    event ListingDated(uint256 _listingDate);
-    event WalletChanged(address _wallet);
+    event ListingDated(uint256 indexed _listingDate);
+    event WalletChanged(address indexed _wallet);
     event TokenWithdrawn(address indexed _wallet, uint256 _amount);
     event EmergencyWithdrawn();
 
@@ -58,36 +68,38 @@ contract LITTVestingContract is Ownable {
         vestingData[VestingType.NEW_GAMES] = VestingData({
             _amount: NEW_GAMES_AMOUNT,
             _amountTGE: 0,
-            _months: 0,
-            _cliffMonths: 12,
+            _months: NEW_GAMES_LINEAR_MONTHS,
+            _cliffMonths: NEW_GAMES_CLIFF,
             _TGEPercentage: 0
         });
         vestingData[VestingType.MARKETING] = VestingData({
             _amount: MARKETING_AMOUNT,
-            _amountTGE: MARKETING_AMOUNT * 5 / 100,
-            _months: 18,
+            _amountTGE: 0,
+            _months: MARKETING_LINEAR_MONTHS,
             _cliffMonths: 0,
-            _TGEPercentage: 5
+            _TGEPercentage: 0
         });
         vestingData[VestingType.LIQUID_RESERVES] = VestingData({
             _amount: LIQUID_RESERVES_AMOUNT,
             _amountTGE: 0,
-            _months: 24,
-            _cliffMonths: 0,
+            _months: LIQUID_RESERVES_LINEAR_MONTHS,
+            _cliffMonths: LIQUID_RESERVES_CLIFF,
             _TGEPercentage: 0
         });
         vestingData[VestingType.AIRDROPS] = VestingData({
             _amount: AIRDROPS_AMOUNT,
-            _amountTGE: AIRDROPS_AMOUNT * 10 / 100,
-            _months: 12,
+            _amountTGE: AIRDROPS_AMOUNT * AIRDROPS_UNLOCK_TGE / 100,
+            _months: AIRDROPS_LINEAR_MONTHS,
             _cliffMonths: 0,
-            _TGEPercentage: 10
+            _TGEPercentage: AIRDROPS_UNLOCK_TGE
         });
+
+        emit WalletChanged(_wallet);
     }
 
     /// @notice Set TGE date (listing date)
     function setListingDate(uint256 _listingDate) external onlyOwner {
-        require(_listingDate >= block.timestamp, "NoPastDate");
+        require(_listingDate == 0 || block.timestamp < _listingDate, "CannotChangeAfterListing");
         listing_date = _listingDate;
 
         emit ListingDated(_listingDate);
@@ -104,9 +116,9 @@ contract LITTVestingContract is Ownable {
     /// @notice Get vesting data
     function getVestingData(uint8 _vestingType) external view returns (
         uint256 amount, 
-        uint24 TGEPercentage, 
-        uint8 months, 
-        uint8 cliffMonths, 
+        uint256 TGEPercentage, 
+        uint256 months, 
+        uint256 cliffMonths, 
         uint256 withdrawn
     ) {
         VestingData memory data = vestingData[VestingType(_vestingType)];
@@ -118,10 +130,9 @@ contract LITTVestingContract is Ownable {
     }
 
     /// @notice Withdraw from New Games pool (not vested)
-    function withdrawNewGames(uint256 _amount) external {
-        // Free Withdraw
-        require(withdrawnBalances[VestingType.NEW_GAMES] + _amount <= NEW_GAMES_AMOUNT, "CantWithdrawMore");
-        _sendTokens(wallet, VestingType.NEW_GAMES, _amount, false);
+    function withdrawNewGames() external {
+        // New Games 9 months cliff, linearly over 54 months
+        _executeVesting(VestingType.NEW_GAMES);
     }
 
     /// @notice Withdraw from Marketing pool (vested)
@@ -181,7 +192,7 @@ contract LITTVestingContract is Ownable {
             _sendTokens(wallet, _vestingType, data._amountTGE, true);
         } else {
             uint256 start = listing_date + (data._cliffMonths * 30 days);
-            uint256 end = start + (uint256(data._months) * 30 days);
+            uint256 end = start + (data._months * 30 days);
             uint256 amountToWithdraw;
             if (block.timestamp < end) {
                 uint256 from = lastWithdraw[_vestingType] == 0 ? start : lastWithdraw[_vestingType];

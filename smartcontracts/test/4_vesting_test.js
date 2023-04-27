@@ -56,22 +56,22 @@ contract("LITTVestingContract tests", async(accounts) => {
         let listingDate = now + 3600;
         await vesting.setListingDate(listingDate);
 
-        for (let i=0; i<36; i++) {
+        for (let i=0; i<64; i++) {
             await increaseTo(listingDate);
             console.log('SIMULATING DAY: ', new Date(listingDate*1000).toISOString());
 
             try { 
-                await vesting.withdrawNewGames(web3.utils.toWei('100000')); 
+                await vesting.withdrawNewGames(); 
             } catch(e) { console.log('NEW_GAMES ERROR: ', e.toString()); }
             const tx1 = await vesting.getVestingData(0); 
             console.log('NEW_GAMES:', web3.utils.fromWei(tx1.withdrawn.toString(),'ether'));
-            
+
             try { 
                 await vesting.withdrawMarketing();
             } catch(e) { console.log('MARKETING ERROR: ', e.toString()); } 
             const tx2 = await vesting.getVestingData(1); 
             console.log('MARKETING:', web3.utils.fromWei(tx2.withdrawn.toString(),'ether')); 
-            
+           
             try { 
                 await vesting.withdrawLiquidReserves();
             } catch(e) { /*console.log('LIQUID_RESERVES ERROR: ', e.toString()); */}
@@ -100,10 +100,10 @@ contract("LITTVestingContract tests", async(accounts) => {
         }
 
         // At the end of the vesting we check the results
-        // tx1: NewGames. We withdrawn 100.000 tokens 36 times, so the balance must be 3.600.000
+        // tx1: NewGames. We withdrawn all the tokens, so the balance should be 555.000.000
         const tx1 = await vesting.getVestingData(0); 
         const balance1 = await web3.utils.fromWei(tx1.withdrawn.toString(),'ether');
-        assert.equal(balance1, 3600000);
+        assert.equal(balance1, 555000000);
         //tx2: Marketing. We withdrawn all the tokens, so the balance should be 150.000.000
         const tx2 = await vesting.getVestingData(1); 
         const balance2 = await web3.utils.fromWei(tx2.withdrawn.toString(),'ether');
@@ -116,13 +116,13 @@ contract("LITTVestingContract tests", async(accounts) => {
         const tx4 = await vesting.getVestingData(3); 
         const balance4 = await web3.utils.fromWei(tx4.withdrawn.toString(),'ether');
         assert.equal(balance4, 30000000); 
-        //tx5: InGameRewards. We withdrawn 300.000 36 times, so the balance should be 10.800.000
+        //tx5: InGameRewards. We withdrawn 300.000 64 times, so the balance should be 19.200.000
         const tx5 = await vesting.getVestingData(4); 
         const balance5 = await web3.utils.fromWei(tx5.withdrawn.toString(),'ether');
-        assert.equal(balance5, 10800000); 
-        //tx6: Farming. We withdrawn 300.000 36 times, so the balance should be 10.800.000
+        assert.equal(balance5, 19200000); 
+        //tx6: Farming. We withdrawn 300.000 64 times, so the balance should be 19.200.000
         const tx6 = await vesting.getVestingData(5); 
         const balance6 = await web3.utils.fromWei(tx6.withdrawn.toString(),'ether');
-        assert.equal(balance6, 10800000); 
+        assert.equal(balance6, 19200000); 
     });
 });

@@ -4,7 +4,6 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/Ownable.sol";
-import "truffle/console.sol";
 
 /// @title Vesting contract for advisors and team tokens
 /// Advisors will have a 24 months period. Also can be added and removed with no restriction
@@ -14,6 +13,7 @@ contract LITTAdvisorsTeam is Ownable {
 
     uint256 constant public TEAM_AMOUNT = 420000000 * 10 ** 18;
     uint8 constant private MAX_SIGNATURES_TEAM = 3;
+    uint8 constant private TEAM_WALLETS = 5;
     uint256 private constant ADVISORS_MONTHS = 24;
     uint256 private constant TEAM_MONTHS = 42;
 
@@ -30,15 +30,16 @@ contract LITTAdvisorsTeam is Ownable {
     mapping(address => bool) private teamApprovals;
     uint8 public numTeamApprovals;
     
-    address public token;
+    address public immutable token;
     uint256 public listing_date;
 
-    event ListingDated(uint256 _listingDate);
+    event ListingDated(uint256 indexed _listingDate);
     event AdvisorAdded(address indexed _wallet, uint256 _amount);
     event AdvisorRemoved(address indexed _wallet);
     event ApprovalWalletsSet(address[5] _approvalWallets);
-    event TeamWalletSet(address _teamWallet);
-    event TeamWithdrawApproved();
+    event TeamWalletSet(address indexed _teamWallet);
+    event TeamWithdrawApproval(address indexed _approval);
+    event TeamWithdrawApproved(address indexed _sender);
     event AdvisorWithdrawn(address indexed _wallet, uint256 _amount);
     event TeamWithdrawn(address indexed _wallet, uint256 _amount);
     event EmergencyWithdrawn();
@@ -47,19 +48,22 @@ contract LITTAdvisorsTeam is Ownable {
     /// @param _token LitlabGames token address
     /// @param _teamWallet Wallet where team tokens are sent when withdrawn
     /// @param _approvalWallets For team tokens, an approval of 3/5 wallets will be required
-    constructor(address _token, address _teamWallet, address[5] memory _approvalWallets) {
+    constructor(address _token, address _teamWallet, address[TEAM_WALLETS] memory _approvalWallets) {
         require(_token != address(0), "ZeroAddress");
         require(_teamWallet != address(0), "ZeroAddress");
-        for (uint256 i=0; i<5; i++) require(_approvalWallets[i] != address(0), "ZeroAddress");
+        for (uint256 i=0; i<TEAM_WALLETS; i++) require(_approvalWallets[i] != address(0), "ZeroAddress");
 
         token = _token;
         teamWallet = _teamWallet;
         approvalWallets = _approvalWallets;
+
+        emit TeamWalletSet(_teamWallet);
+        emit ApprovalWalletsSet(_approvalWallets);
     }
 
     /// @notice Set listing date to start the vesting period
     function setListingDate(uint256 _listingDate) external onlyOwner {
-        require(_listingDate >= block.timestamp, "NoPastDate");
+        require(_listingDate == 0 || block.timestamp < _listingDate, "CannotChangeAfterListing");
         listing_date = _listingDate;
 
         emit ListingDated(_listingDate);
@@ -89,7 +93,7 @@ contract LITTAdvisorsTeam is Ownable {
         for (uint256 i=0;i<approvalWallets.length; i++) delete teamApprovals[approvalWallets[i]];
         numTeamApprovals = 0;
         
-        for (uint256 i=0; i<5; i++) require(_approvalWallets[i] != address(0), "ZeroAddress");
+        for (uint256 i=0; i<TEAM_WALLETS; i++) require(_approvalWallets[i] != address(0), "ZeroAddress");
         approvalWallets = _approvalWallets;
 
         emit ApprovalWalletsSet(_approvalWallets);
@@ -144,9 +148,8 @@ contract LITTAdvisorsTeam is Ownable {
         if (!teamApprovals[msg.sender]) {
             numTeamApprovals++;
             teamApprovals[msg.sender] = true;
+            emit TeamWithdrawApproved(msg.sender);
         }
-
-        emit TeamWithdrawApproved();
     }
 
     /// @notice The team can withdraw their tokens according to the vesting
@@ -154,7 +157,6 @@ contract LITTAdvisorsTeam is Ownable {
         require(block.timestamp >= listing_date + 180 days, "TooEarly");
         require(numTeamApprovals >= MAX_SIGNATURES_TEAM, "NeedMoreApprovals");
         require(TEAM_AMOUNT - teamWithdrawn > 0, "NotAllowed");
-        console.log("Pasa requires");
     
         numTeamApprovals = 0;
         uint256 walletsLength = approvalWallets.length;
@@ -166,13 +168,9 @@ contract LITTAdvisorsTeam is Ownable {
 
         if (block.timestamp < end) {
             uint256 from = teamLastWithdraw == 0 ? start : teamLastWithdraw;
-            console.log("from: %o", from);
             uint256 to = block.timestamp > end ? end : block.timestamp;
-            console.log("to: %o", to);
             uint256 tokensPerSecond = (TEAM_AMOUNT) / (end - start);
-            console.log("tokensPerSecond: %o", tokensPerSecond);
             amountToWithdraw = (to - from) * tokensPerSecond;
-            console.log("amountToWithdraw: %o", amountToWithdraw);
         } else {
             // This is the last time team can withdraw, so he withdraws all their remaining tokens
             amountToWithdraw = TEAM_AMOUNT - teamWithdrawn;

@@ -12,7 +12,7 @@ async function doDeploy(deployer, network, accounts) {
     const stakingEnd = Math.round(new Date('2026-01-01T00:00:00').getTime() / 1000);
     const totalRewards = web3.utils.toWei('1000000');
     const stakersAmount = web3.utils.toWei('1800000');
-    const vestingAmount = web3.utils.toWei('1825000000');
+    const vestingAmount = web3.utils.toWei('1890000000');
     const advisorsAndTeamAmount = web3.utils.toWei('540000000');
 
     const wallets = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]];

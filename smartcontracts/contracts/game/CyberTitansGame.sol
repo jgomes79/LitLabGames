@@ -80,6 +80,11 @@ contract CyberTitansGame is LitlabContext, Ownable {
         wallet = _wallet;
         litlabToken = _litlabToken;
         maxBetAmount = _maxBetAmount;
+
+        emit ManagerChanged(_manager);
+        emit WalletChanged(_wallet);
+        emit LitlabTokenChanged(_litlabToken);
+        emit MaxBetAmountUpdated(_maxBetAmount);
     }
 
     // Functions to change smartcontract variables
@@ -202,7 +207,7 @@ contract CyberTitansGame is LitlabContext, Ownable {
 
         uint256 winnersLen = _winners.length;
         for (uint256 i=0; i<winnersLen; ) {
-            IERC20(game.token).safeTransfer(_winners[i], totalBet * winnersPercentages[i] / 1000);
+            IERC20(token).safeTransfer(_winners[i], totalBet * winnersPercentages[i] / 1000);
             unchecked {
                 ++i;
             }

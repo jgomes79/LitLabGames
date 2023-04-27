@@ -25,7 +25,7 @@ contract LitlabGamesToken is ERC20Permit, Ownable {
 
     event AntisnipeDisabled();
 
-    constructor(address _antisnipe) ERC20("LitlabToken", "LITT") ERC20Permit("LitlabToken") {  
+    constructor(address _antisnipe) ERC20("LitLabToken", "LITT") ERC20Permit("LitlabToken") {  
         _mint(msg.sender, MINT_AMOUNT);
 
         // Change the set to the constructor to ensure nobody can call setAntisnipeAddress more than once

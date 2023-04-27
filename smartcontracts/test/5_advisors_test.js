@@ -53,7 +53,7 @@ contract("LITTAdvisorsTeamContract tests", async(accounts) => {
         let advisorsteam = await LITTAdvisorsTeam.deployed();
     
         let now = Math.round(new Date().getTime() / 1000);
-        let listingDate = now;
+        let listingDate = now + 3600;
         await advisorsteam.setListingDate(listingDate);
 
         await advisorsteam.addAdvisor(accounts[1], web3.utils.toWei('1000000'));

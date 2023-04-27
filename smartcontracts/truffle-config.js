@@ -68,6 +68,13 @@ module.exports = {
       network_id: "*",       // Any network (default: none)
       disableConfirmationListener: true
     },
+    bsc: {
+      provider: () => new HDWalletProvider(MNEMONIC, RPC_URL),
+      network_id: 56,
+      timeoutBlocks: 600,
+      skipDryRun: true,
+      gasPrice: 10000000000
+    },
     bsctestnet: {
       provider: () => new HDWalletProvider(MNEMONIC, RPC_URL),
       network_id: 97,
