@@ -107,6 +107,8 @@ contract CyberTitansTournament is LitlabContext, Ownable {
     }
 
     function updateFees(uint16 _fee, uint16 _rake) external onlyOwner {
+        require(_fee + _rake <= 50, "BadFees");
+        
         fee = _fee;
         rake = _rake;
 
