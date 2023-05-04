@@ -63,7 +63,8 @@ contract LITTAdvisorsTeam is Ownable {
 
     /// @notice Set listing date to start the vesting period
     function setListingDate(uint256 _listingDate) external onlyOwner {
-        require(_listingDate == 0 || block.timestamp < _listingDate, "CannotChangeAfterListing");
+        require(_listingDate >= block.timestamp, "NoPastDate");
+        require(listing_date == 0 || block.timestamp < listing_date, "CannotChangeAfterListing");
         listing_date = _listingDate;
 
         emit ListingDated(_listingDate);

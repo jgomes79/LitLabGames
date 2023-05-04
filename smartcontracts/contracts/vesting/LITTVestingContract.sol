@@ -99,7 +99,8 @@ contract LITTVestingContract is Ownable {
 
     /// @notice Set TGE date (listing date)
     function setListingDate(uint256 _listingDate) external onlyOwner {
-        require(_listingDate == 0 || block.timestamp < _listingDate, "CannotChangeAfterListing");
+        require(_listingDate >= block.timestamp, "NoPastDate");
+        require(listing_date == 0 || block.timestamp < listing_date, "CannotChangeAfterListing");
         listing_date = _listingDate;
 
         emit ListingDated(_listingDate);
